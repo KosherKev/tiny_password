@@ -18,15 +18,6 @@ class TinyPasswordApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDarkMode = ref.watch(isDarkModeProvider);
-    
-    // Initialize repository
-    ref.listen(repositoryStateProvider, (previous, next) {
-      if (next.status == RepositoryStatus.error) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${next.error}'))
-        );
-      }
-    });
 
     // Start initialization
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -48,23 +39,39 @@ class TinyPasswordApp extends ConsumerWidget {
       ),
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       navigatorKey: NavigationService.navigatorKey,
-      home: Consumer(builder: (context, ref, _) {
-        final repoState = ref.watch(repositoryStateProvider);
+      home: const AppHome(),
+    );
+  }
+}
 
-        // Show loading screen while repository is initializing
-        if (repoState.status != RepositoryStatus.initialized) {
-          return const LoadingScreen();
-        }
+class AppHome extends ConsumerWidget {
+  const AppHome({super.key});
 
-        // Once repository is initialized, handle authentication flow
-        return ref.watch(hasMasterPasswordProvider).when(
-          data: (hasPassword) => hasPassword 
-            ? const UnlockScreen() 
-            : const SetupMasterPasswordScreen(),
-          loading: () => const LoadingScreen(),
-          error: (_, __) => const SetupMasterPasswordScreen(),
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Listen for repository errors and show snackbar
+    ref.listen(repositoryStateProvider, (previous, next) {
+      if (next.status == RepositoryStatus.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${next.error}'))
         );
-      }),
+      }
+    });
+
+    final repoState = ref.watch(repositoryStateProvider);
+
+    // Show loading screen while repository is initializing
+    if (repoState.status != RepositoryStatus.initialized) {
+      return const LoadingScreen();
+    }
+
+    // Once repository is initialized, handle authentication flow
+    return ref.watch(hasMasterPasswordProvider).when(
+      data: (hasPassword) => hasPassword 
+        ? const UnlockScreen() 
+        : const SetupMasterPasswordScreen(),
+      loading: () => const LoadingScreen(),
+      error: (_, __) => const SetupMasterPasswordScreen(),
     );
   }
 }
