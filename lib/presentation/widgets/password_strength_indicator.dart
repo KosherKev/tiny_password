@@ -17,7 +17,7 @@ class PasswordStrengthIndicator extends StatelessWidget {
         const SizedBox(height: 8),
         LinearProgressIndicator(
           value: strength / 4,
-          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           color: color,
         ),
         const SizedBox(height: 4),

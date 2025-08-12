@@ -5,8 +5,10 @@ import 'core/services/navigation_service.dart';
 import 'core/services/password_generator_service.dart';
 import 'presentation/screens/auth/setup_master_password_screen.dart';
 import 'presentation/screens/auth/unlock_screen.dart';
+import 'presentation/screens/common/loading_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const ProviderScope(child: TinyPasswordApp()));
 }
 
@@ -16,7 +18,20 @@ class TinyPasswordApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDarkMode = ref.watch(isDarkModeProvider);
-    final hasMasterPassword = ref.watch(hasMasterPasswordProvider);
+    
+    // Initialize repository
+    ref.listen(repositoryStateProvider, (previous, next) {
+      if (next.status == RepositoryStatus.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${next.error}'))
+        );
+      }
+    });
+
+    // Start initialization
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(repositoryStateProvider.notifier).initialize();
+    });
 
     return MaterialApp(
       title: 'Tiny Password',
@@ -33,14 +48,23 @@ class TinyPasswordApp extends ConsumerWidget {
       ),
       themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       navigatorKey: NavigationService.navigatorKey,
-      // Replace the home line with this:
-      home: ref.watch(hasMasterPasswordProvider).when(
-        data: (hasPassword) => hasPassword 
-          ? const UnlockScreen() 
-          : const SetupMasterPasswordScreen(),
-        loading: () => const CircularProgressIndicator(),
-        error: (_, __) => const SetupMasterPasswordScreen(),
-      ),
+      home: Consumer(builder: (context, ref, _) {
+        final repoState = ref.watch(repositoryStateProvider);
+
+        // Show loading screen while repository is initializing
+        if (repoState.status != RepositoryStatus.initialized) {
+          return const LoadingScreen();
+        }
+
+        // Once repository is initialized, handle authentication flow
+        return ref.watch(hasMasterPasswordProvider).when(
+          data: (hasPassword) => hasPassword 
+            ? const UnlockScreen() 
+            : const SetupMasterPasswordScreen(),
+          loading: () => const LoadingScreen(),
+          error: (_, __) => const SetupMasterPasswordScreen(),
+        );
+      }),
     );
   }
 }

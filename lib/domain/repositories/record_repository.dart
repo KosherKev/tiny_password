@@ -69,4 +69,7 @@ abstract class RecordRepository {
 
   /// Clear all data (dangerous operation)
   Future<void> clearAllData();
+
+  /// Dispose of any resources
+  Future<void> dispose();
 }

@@ -100,7 +100,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
       enabled: widget.enabled,
       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: widget.enabled == false
-                ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+                ? Theme.of(context).colorScheme.onSurface.withAlpha(128)
                 : null,
           ),
       decoration: InputDecoration(
@@ -142,14 +142,14 @@ class _CustomTextFieldState extends State<CustomTextField> {
         disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.5),
+            color: Theme.of(context).colorScheme.outline.withAlpha(128),
           ),
         ),
         filled: true,
         fillColor: widget.enabled == false
-            ? Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5)
+            ? Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(128)
             : _isFocused
-                ? Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.1)
+                ? Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(26)
                 : null,
       ),
     );

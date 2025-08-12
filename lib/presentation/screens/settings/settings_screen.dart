@@ -14,6 +14,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _toggleBiometrics() async {
+    if (!mounted) return;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final theme = Theme.of(context);
+
     try {
       final authService = ref.read(authServiceProvider);
       final isBiometricsEnabled = ref.read(isBiometricsEnabledProvider).value ?? false;
@@ -22,7 +26,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final isAvailable = await authService.isBiometricsAvailable();
         if (!isAvailable) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
+          scaffoldMessenger.showSnackBar(
             const SnackBar(
               content: Text('Biometric authentication is not available'),
             ),
@@ -30,10 +34,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           return;
         }
 
+        if (!mounted) return;
         // Verify master password before enabling biometrics
         final result = await showDialog<bool>(
           context: context,
-          builder: (context) => _MasterPasswordDialog(),
+          builder: (context) => const _MasterPasswordDialog(),
         );
         
         if (result != true) return;
@@ -42,11 +47,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await authService.setBiometricsEnabled(!isBiometricsEnabled);
       ref.invalidate(isBiometricsEnabledProvider);
     } catch (e) {
-      if (mounted == false) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(e.toString()),
-          backgroundColor: Theme.of(context).colorScheme.error,
+          backgroundColor: theme.colorScheme.error,
         ),
       );
     }
@@ -59,7 +64,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _exportData() async {
     try {
-      final repository = ref.read(recordRepositoryProvider);
+      final repository = ref.read(repositoryProvider);
       await repository.exportData();
 
       if (!mounted) return;
@@ -79,7 +84,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _importData() async {
     try {
-      final repository = ref.read(recordRepositoryProvider);
+      final repository = ref.read(repositoryProvider);
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['json'],

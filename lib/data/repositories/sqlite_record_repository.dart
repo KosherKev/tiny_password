@@ -4,6 +4,7 @@ import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/encryption/encryption_service.dart';
+import '../../core/services/secure_storage_service.dart';
 import '../../domain/models/record.dart';
 import '../../domain/repositories/record_repository.dart';
 
@@ -12,24 +13,69 @@ class SQLiteRecordRepository implements RecordRepository {
   factory SQLiteRecordRepository() => _instance;
   SQLiteRecordRepository._internal();
 
+  Future<void> dispose() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+    _isInitialized = false;
+  }
+
   Database? _database;
   final EncryptionService _encryptionService = EncryptionService();
+  final SecureStorageService _secureStorage = SecureStorageService();
+  bool _isInitialized = false;
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
+    if (!_isInitialized) throw Exception('Repository not initialized');
+    if (_database == null) throw Exception('Database not initialized');
     return _database!;
+  }
+
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    try {
+      String? dbPassword = await _secureStorage.getDatabasePassword();
+      if (dbPassword == null) {
+        // Generate a secure random password for the database
+        dbPassword = _encryptionService.generatePassword(
+          length: 32,
+          useUppercase: true,
+          useLowercase: true,
+          useNumbers: true,
+          useSpecial: true,
+          excludeSimilar: true,
+        );
+        await _secureStorage.storeDatabasePassword(dbPassword);
+      }
+
+      // Initialize encryption service
+      await _encryptionService.initialize(dbPassword);
+
+      // Initialize database
+      _database = await _initDatabase();
+      _isInitialized = true;
+    } catch (e) {
+      _isInitialized = false;
+      throw Exception('Failed to initialize repository: $e');
+    }
   }
 
   Future<Database> _initDatabase() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final path = join(documentsDirectory.path, AppConstants.dbName);
+    final dbPassword = await _secureStorage.getDatabasePassword();
+
+    if (dbPassword == null) {
+      throw Exception('Database password not found');
+    }
 
     return await openDatabase(
       path,
       version: AppConstants.dbVersion,
       onCreate: _onCreate,
-      password: 'your_database_password', // This should be securely stored and retrieved
+      password: dbPassword,
     );
   }
 
@@ -71,6 +117,27 @@ class SQLiteRecordRepository implements RecordRepository {
       });
     }
     await batch.commit();
+  }
+
+  @override
+  Future<List<String>> getAllCategories() async {
+    final db = await database;
+    final categories = await db.query('categories', columns: ['name']);
+    return categories.map((category) => category['name'] as String).toList();
+  }
+
+  @override
+  Future<int> getRecordCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM records');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  @override
+  Future<int> getCategoryCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM categories');
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
   @override
@@ -184,13 +251,6 @@ class SQLiteRecordRepository implements RecordRepository {
   }
 
   @override
-  Future<List<String>> getAllCategories() async {
-    final db = await database;
-    final categories = await db.query('categories', orderBy: 'name');
-    return categories.map((category) => category['name'] as String).toList();
-  }
-
-  @override
   Future<void> createCategory(String category) async {
     final db = await database;
     await db.insert('categories', {
@@ -287,20 +347,6 @@ class SQLiteRecordRepository implements RecordRepository {
         await txn.insert('records', encryptedRecord);
       }
     });
-  }
-
-  @override
-  Future<int> getRecordCount() async {
-    final db = await database;
-    final result = await db.rawQuery('SELECT COUNT(*) as count FROM records');
-    return Sqflite.firstIntValue(result) ?? 0;
-  }
-
-  @override
-  Future<int> getCategoryCount() async {
-    final db = await database;
-    final result = await db.rawQuery('SELECT COUNT(*) as count FROM categories');
-    return Sqflite.firstIntValue(result) ?? 0;
   }
 
   @override

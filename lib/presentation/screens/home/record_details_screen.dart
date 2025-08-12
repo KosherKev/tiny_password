@@ -58,7 +58,7 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen> {
 
   Future<void> _saveRecord() async {
     try {
-      final repository = ref.read(recordRepositoryProvider);
+      final repository = ref.read(repositoryProvider);
       final record = ref.read(selectedRecordProvider(widget.recordId)).value;
       
       if (record == null) return;

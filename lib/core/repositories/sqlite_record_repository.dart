@@ -10,10 +10,14 @@ class SQLiteRecordRepository {
   static const String _dbName = 'tiny_password.db';
   static const int _dbVersion = 1;
 
-  late final Database _db;
+  late Database _db;
   final CryptoUtils _cryptoUtils;
 
   SQLiteRecordRepository(this._cryptoUtils);
+
+  Future<void> dispose() async {
+    await _db.close();
+  }
 
   Future<void> initialize() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
@@ -135,6 +139,66 @@ class SQLiteRecordRepository {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<List<Record>> getFavoriteRecords() async {
+    final records = await _db.query(
+      'records',
+      where: 'is_favorite = ?',
+      whereArgs: [1],
+    );
+
+    return records.map((record) {
+      final decryptedFields = _decryptFields(record['fields'] as String);
+      return Record.fromJson({
+        ...record,
+        'fields': decryptedFields,
+        'isFavorite': record['is_favorite'] == 1,
+      });
+    }).toList();
+  }
+
+  Future<List<Record>> getRecordsByCategory(String category) async {
+    final records = await _db.query(
+      'records',
+      where: 'category = ?',
+      whereArgs: [category],
+    );
+
+    return records.map((record) {
+      final decryptedFields = _decryptFields(record['fields'] as String);
+      return Record.fromJson({
+        ...record,
+        'fields': decryptedFields,
+        'isFavorite': record['is_favorite'] == 1,
+      });
+    }).toList();
+  }
+
+  Future<int> getRecordCount() async {
+    final result = await _db.rawQuery('SELECT COUNT(*) as count FROM records');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<int> getCategoryCount() async {
+    final result = await _db.rawQuery(
+      'SELECT COUNT(DISTINCT category) as count FROM records WHERE category IS NOT NULL'
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<List<String>> getAllCategories() async {
+    final result = await _db.query(
+      'records',
+      distinct: true,
+      columns: ['category'],
+      where: 'category IS NOT NULL',
+    );
+    
+    return result
+      .map((row) => row['category'] as String)
+      .where((category) => category.isNotEmpty)
+      .toList();
   }
 
   Future<List<Record>> searchRecords(String query) async {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/providers.dart';
 import '../../../domain/models/record.dart';
 import '../../widgets/custom_text_field.dart';
@@ -98,7 +97,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     try {
-      final repository = ref.read(recordRepositoryProvider);
+      final repository = ref.read(repositoryProvider);
       final fields = <String, String>{};
 
       switch (_selectedType) {
