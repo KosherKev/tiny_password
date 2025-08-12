@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/providers.dart';
-import '../../widgets/app_bar.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/snackbar.dart';
+import 'dart:math' as math;
 
 class UnlockScreen extends ConsumerStatefulWidget {
   const UnlockScreen({super.key});
@@ -13,20 +13,44 @@ class UnlockScreen extends ConsumerStatefulWidget {
   ConsumerState<UnlockScreen> createState() => _UnlockScreenState();
 }
 
-class _UnlockScreenState extends ConsumerState<UnlockScreen> {
+class _UnlockScreenState extends ConsumerState<UnlockScreen>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _isBiometricsAvailable = false;
+  late AnimationController _animationController;
+  late AnimationController _particleController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _particleController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    )..repeat();
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    _animationController.forward();
     _checkBiometrics();
   }
 
   @override
   void dispose() {
+    _animationController.dispose();
+    _particleController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -43,18 +67,11 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
         });
 
         if (_isBiometricsAvailable) {
-          // Auto-trigger biometric authentication if available
           _authenticateWithBiometrics();
         }
       }
     } catch (e) {
       print('Error checking biometrics: $e');
-      if (mounted) {
-        CustomSnackBar.showError(
-          context: context,
-          message: 'Failed to check biometric availability',
-        );
-      }
     }
   }
 
@@ -66,27 +83,13 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
       final success = await authService.authenticateWithBiometrics();
 
       if (success && mounted) {
-        // Biometric auth succeeded, but we still need to initialize encryption
-        // For now, we'll need the user to enter the password once more
-        // In a production app, you'd want to securely store the master password
-        // or derive it from biometric data
-        
         CustomSnackBar.showSuccess(
           context: context,
           message: 'Biometric authentication successful',
         );
-        
-        // For now, still require password entry
-        // TODO: Implement secure master password storage for biometric auth
       }
     } catch (e) {
       print('Biometric authentication error: $e');
-      if (mounted) {
-        CustomSnackBar.showError(
-          context: context,
-          message: 'Biometric authentication failed',
-        );
-      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -101,8 +104,6 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
       final authService = ref.read(authServiceProvider);
       final repositoryNotifier = ref.read(repositoryStateProvider.notifier);
       
-      // Step 1: Verify master password
-      print('Verifying master password...');
       final isValid = await authService.verifyMasterPassword(_passwordController.text);
 
       if (!isValid) {
@@ -115,24 +116,11 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
         return;
       }
 
-      print('Master password verified successfully');
-
-      // Step 2: Initialize record encryption with the master password
-      try {
-        await repositoryNotifier.initializeRecordEncryption(_passwordController.text);
-        print('Record encryption initialized');
-      } catch (e) {
-        print('Failed to initialize record encryption: $e');
-        throw Exception('Failed to initialize encryption: $e');
-      }
-
-      // Step 3: Mark as authenticated and navigate
+      await repositoryNotifier.initializeRecordEncryption(_passwordController.text);
       ref.read(isAuthenticatedProvider.notifier).state = true;
 
       if (mounted) {
-        print('Navigating to home screen');
         ref.read(navigationServiceProvider).navigateToHome();
-        
         CustomSnackBar.showSuccess(
           context: context,
           message: 'Welcome back!',
@@ -154,103 +142,291 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CustomAppBar(
-        title: 'Unlock App',
-        showBackButton: false,
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Icon(
-              Icons.lock_outline,
-              size: 64,
-              color: Colors.blue,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Enter your master password to unlock the app.',
-              style: TextStyle(fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-
-            // Password Field
-            CustomTextField(
-              controller: _passwordController,
-              labelText: 'Master Password',
-              obscureText: true,
-              autofocus: !_isBiometricsAvailable,
-              textInputAction: TextInputAction.done,
-              onChanged: (_) => setState(() {}),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your password';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Unlock Button
-            CustomButton(
-              text: 'Unlock',
-              onPressed: _passwordController.text.isEmpty || _isLoading 
-                ? null 
-                : _unlockWithPassword,
-              isLoading: _isLoading,
-              width: double.infinity,
-            ),
-
-            if (_isBiometricsAvailable) ...[              
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 24),
-
-              // Biometric Button
-              CustomButton(
-                text: 'Use Biometrics',
-                onPressed: _isLoading ? null : _authenticateWithBiometrics,
-                icon: Icons.fingerprint,
-                isOutlined: true,
-                width: double.infinity,
-              ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1a1a1a), // Dark marble
+              Color(0xFF2d2d2d), // Medium dark
+              Color(0xFF0f0f0f), // Very dark
             ],
-
-            const SizedBox(height: 32),
-
-            // Forgot Password Help
-            TextButton(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Forgot Password?'),
-                    content: const Text(
-                      'Unfortunately, your master password cannot be recovered. '
-                      'If you\'ve forgotten it, you\'ll need to clear all app data '
-                      'and start fresh.\n\n'
-                      'This will permanently delete all your saved passwords.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        style: TextButton.styleFrom(foregroundColor: Colors.red),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          _showResetConfirmation();
-                        },
-                        child: const Text('Clear All Data'),
-                      ),
-                    ],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Marble texture overlay
+            Container(
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: const AssetImage('assets/images/marble_texture.png'),
+                  fit: BoxFit.cover,
+                  opacity: 0.1,
+                  colorFilter: ColorFilter.mode(
+                    Colors.white.withOpacity(0.05),
+                    BlendMode.overlay,
                   ),
+                ),
+              ),
+            ),
+
+            // Animated gold particles
+            AnimatedBuilder(
+              animation: _particleController,
+              builder: (context, child) {
+                return CustomPaint(
+                  painter: ParticlePainter(_particleController.value),
+                  size: Size.infinite,
                 );
               },
-              child: const Text('Forgot Password?'),
+            ),
+
+            // Main content
+            SafeArea(
+              child: AnimatedBuilder(
+                animation: _fadeAnimation,
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: _fadeAnimation.value,
+                    child: Transform.translate(
+                      offset: Offset(0, 50 * (1 - _fadeAnimation.value)),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const SizedBox(height: 80),
+
+                              // Logo with marble effect
+                              Container(
+                                width: 120,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(30),
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Color(0xFFfbbf24), // Gold
+                                      Color(0xFFf59e0b), // Darker gold
+                                      Color(0xFFd97706), // Amber
+                                    ],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFfbbf24).withOpacity(0.3),
+                                      blurRadius: 20,
+                                      spreadRadius: 5,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.lock_outline,
+                                  size: 60,
+                                  color: Colors.white,
+                                ),
+                              ),
+
+                              const SizedBox(height: 40),
+
+                              // Title with marble text effect
+                              ShaderMask(
+                                shaderCallback: (bounds) => const LinearGradient(
+                                  colors: [
+                                    Colors.white,
+                                    Color(0xFFf3f4f6),
+                                    Color(0xFFfbbf24),
+                                  ],
+                                ).createShader(bounds),
+                                child: const Text(
+                                  'Welcome Back',
+                                  style: TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              Text(
+                                'Enter your master password to unlock your vault',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[400],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+
+                              const SizedBox(height: 60),
+
+                              // Password input with marble styling
+                              Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Colors.white.withOpacity(0.1),
+                                      Colors.white.withOpacity(0.05),
+                                    ],
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: CustomTextField(
+                                  controller: _passwordController,
+                                  labelText: 'Master Password',
+                                  obscureText: true,
+                                  autofocus: !_isBiometricsAvailable,
+                                  textInputAction: TextInputAction.done,
+                                  onChanged: (_) => setState(() {}),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter your password';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+
+                              const SizedBox(height: 32),
+
+                              // Unlock button with gold gradient
+                              CustomButton(
+                                text: 'Unlock Vault',
+                                onPressed: _passwordController.text.isEmpty || _isLoading 
+                                  ? null 
+                                  : _unlockWithPassword,
+                                isLoading: _isLoading,
+                                width: double.infinity,
+                              ),
+
+                              if (_isBiometricsAvailable) ...[
+                                const SizedBox(height: 24),
+                                
+                                // Divider with marble styling
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        height: 1,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Colors.transparent,
+                                              Colors.grey[600]!,
+                                              Colors.transparent,
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      child: Text(
+                                        'or use',
+                                        style: TextStyle(
+                                          color: Colors.grey[400],
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Container(
+                                        height: 1,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Colors.transparent,
+                                              Colors.grey[600]!,
+                                              Colors.transparent,
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 24),
+
+                                // Biometric button
+                                CustomButton(
+                                  text: 'Biometric Authentication',
+                                  onPressed: _isLoading ? null : _authenticateWithBiometrics,
+                                  icon: Icons.fingerprint,
+                                  isOutlined: true,
+                                  width: double.infinity,
+                                ),
+                              ],
+
+                              const SizedBox(height: 40),
+
+                              // Forgot password with marble styling
+                              TextButton(
+                                onPressed: () => _showResetConfirmation(),
+                                child: Text(
+                                  'Forgot Password?',
+                                  style: TextStyle(
+                                    color: const Color(0xFFfbbf24),
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 40),
+
+                              // Security notice
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      const Color(0xFFfbbf24).withOpacity(0.1),
+                                      const Color(0xFFf59e0b).withOpacity(0.05),
+                                    ],
+                                  ),
+                                  border: Border.all(
+                                    color: const Color(0xFFfbbf24).withOpacity(0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.security,
+                                      color: Color(0xFFfbbf24),
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Your data is protected with military-grade AES-256 encryption',
+                                        style: TextStyle(
+                                          color: const Color(0xFFfbbf24),
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -262,21 +438,96 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear All Data'),
-        content: const Text(
+        backgroundColor: const Color(0xFF1a1a1a),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: Colors.white.withOpacity(0.1),
+          ),
+        ),
+        title: Text(
+          'Forgot Password?',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Unfortunately, your master password cannot be recovered. '
+          'If you\'ve forgotten it, you\'ll need to clear all app data '
+          'and start fresh.\n\n'
+          'This will permanently delete all your saved passwords.',
+          style: TextStyle(
+            color: Colors.grey[300],
+            fontSize: 14,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey[400]),
+            ),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red[400],
+            ),
+            onPressed: () {
+              Navigator.of(context).pop();
+              _showFinalResetConfirmation();
+            },
+            child: const Text('Clear All Data'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFinalResetConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1a1a1a),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: Colors.red.withOpacity(0.3),
+          ),
+        ),
+        title: Text(
+          'Clear All Data',
+          style: TextStyle(
+            color: Colors.red[400],
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
           'This will permanently delete:\n'
           '• All saved passwords\n'
           '• All app settings\n'
           '• Master password\n\n'
           'This action cannot be undone.',
+          style: TextStyle(
+            color: Colors.grey[300],
+            fontSize: 14,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey[400]),
+            ),
           ),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red[400],
+            ),
             onPressed: () async {
               Navigator.of(context).pop();
               
@@ -287,7 +538,6 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
                 final repositoryNotifier = ref.read(repositoryStateProvider.notifier);
                 await repositoryNotifier.clearAllData();
                 
-                // Invalidate providers to refresh state
                 ref.invalidate(hasMasterPasswordProvider);
                 ref.invalidate(repositoryStateProvider);
                 
@@ -312,4 +562,35 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen> {
       ),
     );
   }
+}
+
+// Custom painter for floating gold particles
+class ParticlePainter extends CustomPainter {
+  final double animationValue;
+
+  ParticlePainter(this.animationValue);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFfbbf24).withOpacity(0.6)
+      ..style = PaintingStyle.fill;
+
+    // Create floating particles
+    for (int i = 0; i < 15; i++) {
+      final x = (size.width * (i * 0.1 + 0.1)) + 
+                (20 * math.sin(animationValue * 2 * math.pi + i));
+      final y = (size.height * (i * 0.05 + 0.1)) + 
+                (30 * math.cos(animationValue * 2 * math.pi + i * 0.5));
+      
+      canvas.drawCircle(
+        Offset(x % size.width, y % size.height),
+        2 + math.sin(animationValue * 4 * math.pi + i) * 1,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

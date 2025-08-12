@@ -1,33 +1,49 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 
-class PasswordStrengthIndicator extends StatelessWidget {
+class PasswordStrengthIndicator extends StatefulWidget {
   final String password;
 
   const PasswordStrengthIndicator({required this.password, super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final strength = _calculatePasswordStrength(password);
-    final (color, label) = _getStrengthProperties(strength, context);
+  State<PasswordStrengthIndicator> createState() => _PasswordStrengthIndicatorState();
+}
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: strength / 4,
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-          color: color,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Password Strength: $label',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
-        ),
-        if (password.isNotEmpty) ..._buildRequirements(context),
-      ],
+class _PasswordStrengthIndicatorState extends State<PasswordStrengthIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _progressAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
     );
+    _progressAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(PasswordStrengthIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.password != widget.password) {
+      _animationController.reset();
+      _animationController.forward();
+    }
   }
 
   int _calculatePasswordStrength(String password) {
@@ -49,77 +65,246 @@ class PasswordStrengthIndicator extends StatelessWidget {
     return (strength / 6 * 4).floor();
   }
 
-  (Color, String) _getStrengthProperties(int strength, BuildContext context) {
+  (Color, String, IconData) _getStrengthProperties(int strength) {
     switch (strength) {
       case 0:
-        return (Colors.grey, 'Too Short');
+        return (const Color(0xFFef4444), 'Too Short', Icons.error_outline);
       case 1:
-        return (Colors.red, 'Weak');
+        return (const Color(0xFFf97316), 'Weak', Icons.warning_amber);
       case 2:
-        return (Colors.orange, 'Fair');
+        return (const Color(0xFFf59e0b), 'Fair', Icons.info_outline);
       case 3:
-        return (Colors.yellow, 'Good');
+        return (const Color(0xFF84cc16), 'Good', Icons.check_circle_outline);
       case 4:
-        return (Colors.green, 'Strong');
+        return (const Color(0xFF22c55e), 'Strong', Icons.verified);
       default:
-        return (Colors.grey, 'Invalid');
+        return (Colors.grey, 'Invalid', Icons.help_outline);
     }
   }
 
-  List<Widget> _buildRequirements(BuildContext context) {
-    final requirements = [
-      _buildRequirement(
-        context,
-        'At least ${AppConstants.minPasswordLength} characters',
-        password.length >= AppConstants.minPasswordLength,
-      ),
-      _buildRequirement(
-        context,
-        'Contains uppercase letter',
-        password.contains(RegExp(r'[A-Z]')),
-      ),
-      _buildRequirement(
-        context,
-        'Contains lowercase letter',
-        password.contains(RegExp(r'[a-z]')),
-      ),
-      _buildRequirement(
-        context,
-        'Contains number',
-        password.contains(RegExp(r'[0-9]')),
-      ),
-      _buildRequirement(
-        context,
-        'Contains special character',
-        password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]')),
-      ),
-    ];
+  @override
+  Widget build(BuildContext context) {
+    final strength = _calculatePasswordStrength(widget.password);
+    final (color, label, icon) = _getStrengthProperties(strength);
+    final progress = strength / 4;
 
-    return [
-      const SizedBox(height: 8),
-      ...requirements,
-    ];
+    return AnimatedBuilder(
+      animation: _progressAnimation,
+      builder: (context, child) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: [
+                Colors.white.withOpacity(0.05),
+                Colors.white.withOpacity(0.02),
+              ],
+            ),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.1),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header with strength indicator
+              Row(
+                children: [
+                  Icon(
+                    icon,
+                    color: color,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Password Strength: ',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${(progress * 100).round()}%',
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Progress bar with marble effect
+              Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: Colors.grey[800],
+                ),
+                child: Stack(
+                  children: [
+                    // Background pattern
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(4),
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.grey[800]!,
+                            Colors.grey[700]!,
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Progress fill
+                    FractionallySizedBox(
+                      widthFactor: progress * _progressAnimation.value,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          gradient: LinearGradient(
+                            colors: [
+                              color,
+                              color.withOpacity(0.8),
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: color.withOpacity(0.4),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (widget.password.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                ..._buildRequirements(),
+              ],
+            ],
+          ),
+        );
+      },
+    );
   }
 
-  Widget _buildRequirement(BuildContext context, String text, bool isMet) {
+  List<Widget> _buildRequirements() {
+    final requirements = [
+      _buildRequirement(
+        'At least ${AppConstants.minPasswordLength} characters',
+        widget.password.length >= AppConstants.minPasswordLength,
+        Icons.straighten,
+      ),
+      _buildRequirement(
+        'Contains uppercase letter',
+        widget.password.contains(RegExp(r'[A-Z]')),
+        Icons.keyboard_arrow_up,
+      ),
+      _buildRequirement(
+        'Contains lowercase letter',
+        widget.password.contains(RegExp(r'[a-z]')),
+        Icons.keyboard_arrow_down,
+      ),
+      _buildRequirement(
+        'Contains number',
+        widget.password.contains(RegExp(r'[0-9]')),
+        Icons.pin,
+      ),
+      _buildRequirement(
+        'Contains special character',
+        widget.password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]')),
+        Icons.star_outline,
+      ),
+    ];
+
+    return requirements;
+  }
+
+  Widget _buildRequirement(String text, bool isMet, IconData iconData) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Icon(
-            isMet ? Icons.check_circle : Icons.circle_outlined,
-            size: 16,
-            color: isMet
-                ? Colors.green
-                : Theme.of(context).colorScheme.onSurfaceVariant,
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: isMet
+                  ? const LinearGradient(
+                      colors: [
+                        Color(0xFF22c55e),
+                        Color(0xFF16a34a),
+                      ],
+                    )
+                  : LinearGradient(
+                      colors: [
+                        Colors.grey[600]!,
+                        Colors.grey[700]!,
+                      ],
+                    ),
+              boxShadow: isMet
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF22c55e).withOpacity(0.3),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                isMet ? Icons.check : iconData,
+                key: ValueKey(isMet),
+                size: 12,
+                color: Colors.white,
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 300),
+              style: TextStyle(
+                fontSize: 14,
+                color: isMet 
+                    ? const Color(0xFF22c55e)
+                    : Colors.grey[400],
+                fontWeight: isMet ? FontWeight.w500 : FontWeight.normal,
+              ),
+              child: Text(text),
+            ),
           ),
+          if (isMet)
+            AnimatedScale(
+              scale: 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: Icon(
+                Icons.check_circle,
+                size: 16,
+                color: const Color(0xFF22c55e),
+              ),
+            ),
         ],
       ),
     );

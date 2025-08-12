@@ -41,6 +41,14 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<!-- Add these privacy usage descriptions -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Tiny Password uses Face ID to quickly and securely unlock your password vault without entering your master password.</string>
+
+	<key>NSBiometricUsageDescription</key>
+	<string>Tiny Password uses biometric authentication (Face ID/Touch ID) to provide secure and convenient access to your encrypted password vault.</string>		
+
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

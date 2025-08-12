@@ -51,10 +51,13 @@ class CustomTextField extends StatefulWidget {
   State<CustomTextField> createState() => _CustomTextFieldState();
 }
 
-class _CustomTextFieldState extends State<CustomTextField> {
+class _CustomTextFieldState extends State<CustomTextField>
+    with TickerProviderStateMixin {
   late bool _obscureText;
   late FocusNode _focusNode;
   bool _isFocused = false;
+  late AnimationController _animationController;
+  late Animation<double> _focusAnimation;
 
   @override
   void initState() {
@@ -62,6 +65,18 @@ class _CustomTextFieldState extends State<CustomTextField> {
     _obscureText = widget.obscureText;
     _focusNode = widget.focusNode ?? FocusNode();
     _focusNode.addListener(_handleFocusChange);
+    
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _focusAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
   }
 
   @override
@@ -70,6 +85,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
       _focusNode.dispose();
     }
     _focusNode.removeListener(_handleFocusChange);
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -78,115 +94,174 @@ class _CustomTextFieldState extends State<CustomTextField> {
       setState(() {
         _isFocused = _focusNode.hasFocus;
       });
+      
+      if (_isFocused) {
+        _animationController.forward();
+      } else {
+        _animationController.reverse();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: widget.controller,
-      focusNode: _focusNode,
-      obscureText: _obscureText,
-      readOnly: widget.readOnly,
-      autofocus: widget.autofocus,
-      keyboardType: widget.keyboardType,
-      textInputAction: widget.textInputAction,
-      onChanged: widget.onChanged,
-      onTap: widget.onTap,
-      validator: widget.validator,
-      inputFormatters: widget.inputFormatters,
-      maxLines: widget.obscureText ? 1 : widget.maxLines,
-      minLines: widget.minLines,
-      enabled: widget.enabled,
-      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: widget.enabled == false
-                ? Theme.of(context).colorScheme.onSurface.withAlpha(128)
+    return AnimatedBuilder(
+      animation: _focusAnimation,
+      builder: (context, child) {
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.1 + _focusAnimation.value * 0.05),
+                Colors.white.withOpacity(0.05 + _focusAnimation.value * 0.03),
+              ],
+            ),
+            border: Border.all(
+              color: _getBorderColor(),
+              width: 1 + _focusAnimation.value,
+            ),
+            boxShadow: [
+              if (_isFocused)
+                BoxShadow(
+                  color: const Color(0xFFfbbf24).withOpacity(0.2),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+            ],
+          ),
+          child: TextFormField(
+            controller: widget.controller,
+            focusNode: _focusNode,
+            obscureText: _obscureText,
+            readOnly: widget.readOnly,
+            autofocus: widget.autofocus,
+            keyboardType: widget.keyboardType,
+            textInputAction: widget.textInputAction,
+            onChanged: widget.onChanged,
+            onTap: widget.onTap,
+            validator: widget.validator,
+            inputFormatters: widget.inputFormatters,
+            maxLines: widget.obscureText ? 1 : widget.maxLines,
+            minLines: widget.minLines,
+            enabled: widget.enabled,
+            style: TextStyle(
+              color: widget.enabled == false ? Colors.grey[400] : Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: InputDecoration(
+              labelText: widget.labelText,
+              hintText: widget.hintText,
+              errorText: widget.errorText,
+              prefixIcon: widget.prefix != null 
+                ? Container(
+                    margin: const EdgeInsets.only(left: 16, right: 12),
+                    child: widget.prefix,
+                  )
                 : null,
+              suffixIcon: _buildSuffixIcon(),
+              contentPadding: widget.contentPadding ?? 
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              labelStyle: TextStyle(
+                color: _isFocused 
+                  ? const Color(0xFFfbbf24)
+                  : Colors.grey[400],
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              hintStyle: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 16,
+              ),
+              errorStyle: const TextStyle(
+                color: Color(0xFFef4444),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
-      decoration: InputDecoration(
-        labelText: widget.labelText,
-        hintText: widget.hintText,
-        errorText: widget.errorText,
-        prefixIcon: widget.prefix,
-        suffixIcon: _buildSuffixIcon(),
-        contentPadding: widget.contentPadding,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.outline,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.primary,
-            width: 2,
-          ),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.error,
-          ),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.error,
-            width: 2,
-          ),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(
-            color: Theme.of(context).colorScheme.outline.withAlpha(128),
-          ),
-        ),
-        filled: true,
-        fillColor: widget.enabled == false
-            ? Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(128)
-            : _isFocused
-                ? Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(26)
-                : null,
-      ),
+        );
+      },
     );
+  }
+
+  Color _getBorderColor() {
+    if (widget.errorText != null) {
+      return const Color(0xFFef4444);
+    }
+    if (_isFocused) {
+      return const Color(0xFFfbbf24);
+    }
+    return Colors.white.withOpacity(0.2);
   }
 
   Widget? _buildSuffixIcon() {
     if (widget.suffix != null) return widget.suffix;
 
+    List<Widget> actions = [];
+
+    // Password visibility toggle
     if (widget.obscureText) {
-      return IconButton(
-        icon: Icon(
-          _obscureText ? Icons.visibility_off : Icons.visibility,
-          color: _isFocused
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurfaceVariant,
+      actions.add(
+        IconButton(
+          icon: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Icon(
+              _obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              key: ValueKey(_obscureText),
+              color: _isFocused
+                  ? const Color(0xFFfbbf24)
+                  : Colors.grey[400],
+              size: 22,
+            ),
+          ),
+          onPressed: () {
+            setState(() {
+              _obscureText = !_obscureText;
+            });
+          },
         ),
-        onPressed: () {
-          setState(() {
-            _obscureText = !_obscureText;
-          });
-        },
       );
     }
 
-    if (widget.controller != null && widget.controller!.text.isNotEmpty) {
-      return IconButton(
-        icon: Icon(
-          Icons.clear,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
+    // Clear button
+    if (widget.controller != null && 
+        widget.controller!.text.isNotEmpty && 
+        !widget.obscureText &&
+        !widget.readOnly) {
+      actions.add(
+        IconButton(
+          icon: Icon(
+            Icons.clear_rounded,
+            color: Colors.grey[400],
+            size: 22,
+          ),
+          onPressed: () {
+            widget.controller?.clear();
+            widget.onChanged?.call('');
+          },
         ),
-        onPressed: () {
-          widget.controller?.clear();
-          widget.onChanged?.call('');
-        },
       );
     }
 
-    return null;
+    if (actions.isEmpty) return null;
+
+    if (actions.length == 1) {
+      return actions.first;
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: actions,
+    );
   }
 }
