@@ -2,43 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/providers.dart';
 
-class LoadingScreen extends StatefulWidget {
+class LoadingScreen extends ConsumerWidget {
   const LoadingScreen({super.key});
 
   @override
-  State<LoadingScreen> createState() => _LoadingScreenState();
-}
-
-class _LoadingScreenState extends State<LoadingScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(
-      begin: 0.3,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-    _animationController.repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final repositoryState = ref.watch(repositoryStateProvider);
     final theme = Theme.of(context);
 
@@ -51,12 +19,13 @@ class _LoadingScreenState extends State<LoadingScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // App Logo with Animation
-                AnimatedBuilder(
-                  animation: _fadeAnimation,
-                  builder: (context, child) {
+                // App Logo with simple animation
+                TweenAnimationBuilder<double>(
+                  duration: const Duration(milliseconds: 1500),
+                  tween: Tween(begin: 0.3, end: 1.0),
+                  builder: (context, value, child) {
                     return Opacity(
-                      opacity: _fadeAnimation.value,
+                      opacity: value,
                       child: Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -114,7 +83,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                         icon: const Icon(Icons.refresh),
                         label: const Text('Retry'),
                         onPressed: () {
-                          context.read(repositoryStateProvider.notifier).retry();
+                          ref.read(repositoryStateProvider.notifier).retry();
                         },
                       ),
                       const SizedBox(height: 16),
