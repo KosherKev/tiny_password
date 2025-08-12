@@ -9,6 +9,8 @@ import '../../widgets/password_strength_indicator.dart';
 import '../../widgets/snackbar.dart';
 import 'dart:math' as math;
 
+import 'unlock_screen.dart';
+
 class SetupMasterPasswordScreen extends ConsumerStatefulWidget {
   const SetupMasterPasswordScreen({super.key});
 
@@ -108,14 +110,47 @@ class _SetupMasterPasswordScreenState
         }
       }
 
-      ref.read(isAuthenticatedProvider.notifier).state = true;
+      if (mounted && isBiometricsAvailable) {
+        final shouldEnableBiometrics = await CustomDialog.showConfirmationDialog(
+          context: context,
+          title: 'Enable Biometric Authentication',
+          message:
+              'Would you like to enable biometric authentication for quicker access?\n\n'
+              'Note: You will still need to enter your master password occasionally for security.',
+          confirmText: 'Enable',
+          cancelText: 'Skip',
+        );
 
+        if (shouldEnableBiometrics ?? false) {
+          try {
+            await authService.setBiometricsEnabled(true);
+          } catch (e) {
+            if (mounted) {
+              CustomSnackBar.showWarning(
+                context: context,
+                message: 'Failed to enable biometrics: $e',
+              );
+            }
+          }
+        }
+      }
+
+      // Just show success message and navigate directly to unlock
       if (mounted) {
-        ref.read(navigationServiceProvider).navigateToHome();
         CustomSnackBar.showSuccess(
           context: context,
-          message: 'Master password set successfully! Welcome to Tiny Password.',
+          message: 'Master password created successfully!',
         );
+        
+        // Small delay to prevent navigation conflicts
+        await Future.delayed(const Duration(milliseconds: 300));
+        
+        if (mounted) {
+          // Navigate directly to unlock screen
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const UnlockScreen()),
+          );
+        }
       }
     } catch (e) {
       setState(() => _isLoading = false);

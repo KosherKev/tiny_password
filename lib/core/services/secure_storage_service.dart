@@ -13,14 +13,16 @@ class SecureStorageService {
   bool _useSecureStorage = true;
   bool _initialized = false;
 
-  static const _keyDatabasePassword = 'database_password';
-  static const _keyMasterPassword = 'master_password_hash';
-  static const _keyEncryptionKey = 'encryption_key';
-  static const _keyIV = 'encryption_iv';
-  static const _keyBiometricsEnabled = 'biometrics_enabled';
+  static const _keyDatabasePassword = 'tiny_password_db_password_v2';
+  static const _keyMasterPassword = 'tiny_password_master_hash_v2';
+  static const _keyEncryptionKey = 'tiny_password_encryption_key_v2';
+  static const _keyIV = 'tiny_password_iv_v2';
+  static const _keyBiometricsEnabled = 'tiny_password_biometrics_v2';
 
   Future<void> _initStorage() async {
     if (_initialized) return;
+
+    await clearKeychainOnFirstLaunch();
     
     try {
       print('Initializing secure storage...');
@@ -334,6 +336,55 @@ class SecureStorageService {
     }
   }
 
+  // Future<void> forceDeleteSpecificKeys() async {
+  //   try {
+  //     print('MANUAL KEY DELETION: Starting');
+      
+  //     // Create a fresh storage instance with the same config as used elsewhere
+  //     AndroidOptions androidOptions = const AndroidOptions(
+  //       encryptedSharedPreferences: true,
+  //       keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
+  //       storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
+  //     );
+      
+  //     IOSOptions iosOptions = const IOSOptions(
+  //       accessibility: KeychainAccessibility.first_unlock_this_device,
+  //     );
+      
+  //     final storage = FlutterSecureStorage(
+  //       aOptions: androidOptions,
+  //       iOptions: iosOptions,
+  //     );
+      
+  //     // Manually delete each key
+  //     final keysToDelete = [
+  //       _keyDatabasePassword,
+  //       _keyMasterPassword, 
+  //       _keyEncryptionKey,
+  //       _keyIV,
+  //       _keyBiometricsEnabled,
+  //     ];
+      
+  //     for (final key in keysToDelete) {
+  //       await storage.delete(key: key);
+  //       print('MANUAL KEY DELETION: Deleted $key');
+  //     }
+      
+  //     // Also try deleteAll for good measure
+  //     await storage.deleteAll();
+  //     print('MANUAL KEY DELETION: Called deleteAll()');
+      
+  //     // Clear SharedPreferences
+  //     final prefs = await SharedPreferences.getInstance();
+  //     await prefs.clear();
+  //     print('MANUAL KEY DELETION: Cleared SharedPreferences');
+      
+  //     print('MANUAL KEY DELETION: Complete');
+  //   } catch (e) {
+  //     print('Error in manual key deletion: $e');
+  //   }
+  // }
+
   Future<bool> hasMasterPassword() async {
     try {
       final hash = await getMasterPasswordHash();
@@ -354,5 +405,39 @@ class SecureStorageService {
     _prefs = null;
     _useSecureStorage = true;
     await _initStorage();
+  }
+
+  Future<void> clearKeychainOnFirstLaunch() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Check if this is first launch after reinstall
+      if (prefs.getBool('is_first_app_launch') ?? true) {
+        print('First launch detected - clearing ALL storage');
+        
+        // Clear ALL secure storage completely
+        if (_storage != null) {
+          await _storage!.deleteAll();
+          print('Secure storage cleared completely');
+        }
+        
+        // Force clear SharedPreferences completely
+        await prefs.clear();
+        print('SharedPreferences cleared completely');
+        
+        // Reset internal state
+        _initialized = false;
+        _storage = null;
+        _prefs = null;
+        _useSecureStorage = true;
+        
+        // Re-mark first launch (since we just cleared prefs)
+        await prefs.setBool('is_first_app_launch', false);
+        
+        print('Complete storage reset on first launch');
+      }
+    } catch (e) {
+      print('Error clearing storage on first launch: $e');
+    }
   }
 }
