@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/providers.dart';
+import '../../../data/repositories/sqlite_record_repository.dart';
+import '../auth/setup_master_password_screen.dart';
 import 'dart:math' as math;
 
 class LoadingScreen extends ConsumerStatefulWidget {
@@ -352,8 +354,33 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
             ),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: () {
-                // Navigate to recovery options
+              onPressed: () async {
+                final repositoryState = ref.read(repositoryStateProvider);
+                if (repositoryState.repository != null) {
+                  try {
+                    final sqliteRepo = repositoryState.repository! as SQLiteRecordRepository;
+                    await sqliteRepo.deleteDatabase();
+                    print('Database file deleted during recovery');
+                  } catch (e) {
+                    print('Could not delete database file: $e');
+                  }
+                }
+                
+                final authService = ref.read(authServiceProvider);
+                await authService.clearSecureStorage();
+                print('Secure storage cleared during recovery');
+                
+                ref.invalidate(repositoryStateProvider);
+                ref.invalidate(hasMasterPasswordProvider);
+                ref.invalidate(isBiometricsEnabledProvider);
+                
+                if (!context.mounted) return;
+                
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => const SetupMasterPasswordScreen(),
+                  ),
+                );
               },
               child: Text(
                 'Show Recovery Options',

@@ -1,10 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/providers/providers.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/custom_text_field.dart';
-import '../../widgets/snackbar.dart';
-import 'dart:math' as math;
+import 'package:tiny_password/core/providers/providers.dart';
+import 'package:tiny_password/data/repositories/sqlite_record_repository.dart';
+import 'package:tiny_password/presentation/screens/auth/setup_master_password_screen.dart';
+import 'package:tiny_password/presentation/widgets/custom_button.dart';
+import 'package:tiny_password/presentation/widgets/snackbar.dart';
+import 'package:tiny_password/presentation/widgets/custom_text_field.dart';
 
 class UnlockScreen extends ConsumerStatefulWidget {
   const UnlockScreen({super.key});
@@ -83,9 +86,12 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
       final success = await authService.authenticateWithBiometrics();
 
       if (success && mounted) {
-        CustomSnackBar.showSuccess(
+        // For biometric auth, we need to handle the fact that we don't have the actual password
+        // In a real implementation, you'd need to store the master password securely or derive it
+        // For now, we'll show a success message but note this is a limitation
+        CustomSnackBar.showError(
           context: context,
-          message: 'Biometric authentication successful',
+          message: 'Biometric authentication succeeded, but master password is required for encryption. Please enter your password.',
         );
       }
     } catch (e) {
@@ -532,26 +538,64 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
               Navigator.of(context).pop();
               
               try {
+                // Perform complete reset
                 final authService = ref.read(authServiceProvider);
                 await authService.clearSecureStorage();
                 
-                final repositoryNotifier = ref.read(repositoryStateProvider.notifier);
-                await repositoryNotifier.clearAllData();
+                final repositoryState = ref.read(repositoryStateProvider);
+                if (repositoryState.repository != null) {
+                  try {
+                    final sqliteRepo = repositoryState.repository! as SQLiteRecordRepository;
+                    await sqliteRepo.deleteDatabase();
+                    print('Database file deleted');
+                  } catch (e) {
+                    print('Could not delete database file: $e');
+                  }
+                  
+                  try {
+                    await repositoryState.repository!.dispose();
+                    print('Repository disposed');
+                  } catch (e) {
+                    print('Could not dispose repository: $e');
+                  }
+                }
                 
+                // Invalidate all providers
                 ref.invalidate(hasMasterPasswordProvider);
                 ref.invalidate(repositoryStateProvider);
+                ref.invalidate(isBiometricsEnabledProvider);
                 
                 if (mounted) {
                   CustomSnackBar.showSuccess(
                     context: context,
-                    message: 'All data cleared. Please set up a new master password.',
+                    message: 'All data cleared. Redirecting to setup...',
                   );
+                  
+                  // Navigate to setup screen
+                  await Future.delayed(const Duration(seconds: 1));
+                  
+                  if (mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (_) => const SetupMasterPasswordScreen(),
+                      ),
+                      (route) => false,
+                    );
+                  }
                 }
               } catch (e) {
                 if (mounted) {
                   CustomSnackBar.showError(
                     context: context,
                     message: 'Failed to clear data: $e',
+                  );
+                  
+                  // Force navigation to setup anyway
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const SetupMasterPasswordScreen(),
+                    ),
+                    (route) => false,
                   );
                 }
               }

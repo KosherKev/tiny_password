@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tiny_password/core/providers/providers.dart';
 import 'core/services/navigation_service.dart';
 import 'core/services/password_generator_service.dart';
+import 'data/repositories/sqlite_record_repository.dart';
 import 'presentation/screens/auth/setup_master_password_screen.dart';
 import 'presentation/screens/auth/unlock_screen.dart';
 import 'presentation/screens/common/loading_screen.dart';
@@ -102,76 +103,7 @@ class DebugClearDataScreen extends ConsumerWidget {
                 ),
                 icon: const Icon(Icons.delete_forever),
                 label: const Text('Clear All Data & Start Fresh'),
-                onPressed: () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Confirm Clear Data'),
-                      content: const Text(
-                        'This will permanently delete all stored data including:\n'
-                        '• All saved passwords\n'
-                        '• App settings\n'
-                        '• Master password\n\n'
-                        'This action cannot be undone.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          style: TextButton.styleFrom(foregroundColor: Colors.red),
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('Clear All Data'),
-                        ),
-                      ],
-                    ),
-                  );
-                  
-                  if (confirmed != true) return;
-                  
-                  try {
-                    // Clear auth service data
-                    final authService = ref.read(authServiceProvider);
-                    await authService.clearSecureStorage();
-                    
-                    // Clear repository data if possible
-                    try {
-                      if (repositoryState.repository != null) {
-                        await repositoryState.repository!.clearAllData();
-                      }
-                    } catch (e) {
-                      print('Could not clear repository data: $e');
-                    }
-                    
-                    // Invalidate all providers to force refresh
-                    ref.invalidate(hasMasterPasswordProvider);
-                    ref.invalidate(repositoryStateProvider);
-                    
-                    if (!context.mounted) return;
-                    
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Data cleared! Restarting app...'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                    
-                    // Force app restart by reinitializing
-                    await Future.delayed(const Duration(seconds: 1));
-                    ref.read(repositoryStateProvider.notifier).initialize();
-                    
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error clearing data: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                },
+                onPressed: () => _performCompleteReset(context, ref),
               ),
             ),
             
@@ -192,6 +124,121 @@ class DebugClearDataScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _performCompleteReset(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Complete Reset'),
+        content: const Text(
+          'This will completely reset the app and delete all data:\n\n'
+          '• All saved passwords\n'
+          '• App settings\n'
+          '• Master password\n'
+          '• Database files\n'
+          '• Secure storage\n\n'
+          'This action cannot be undone and will force a fresh start.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Reset Everything'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed != true) return;
+    
+    try {
+      // Step 1: Clear auth service and secure storage
+      final authService = ref.read(authServiceProvider);
+      await authService.clearSecureStorage();
+      print('Secure storage cleared');
+      
+      // Step 2: Reset repository state
+      final repositoryNotifier = ref.read(repositoryStateProvider.notifier);
+      
+      // Try to delete database file and clear all data
+      try {
+        final repositoryState = ref.read(repositoryStateProvider);
+        if (repositoryState.repository != null) {
+          final sqliteRepo = repositoryState.repository! as SQLiteRecordRepository;
+          await sqliteRepo.deleteDatabase();
+          print('Database file deleted');
+        }
+      } catch (e) {
+        print('Could not delete database file: $e');
+      }
+      
+      // Step 3: Dispose current repository
+      try {
+        final repositoryState = ref.read(repositoryStateProvider);
+        if (repositoryState.repository != null) {
+          await repositoryState.repository!.dispose();
+          print('Repository disposed');
+        }
+      } catch (e) {
+        print('Could not dispose repository: $e');
+      }
+      
+      // Step 4: Invalidate all providers to force complete refresh
+      ref.invalidate(repositoryStateProvider);
+      ref.invalidate(hasMasterPasswordProvider);
+      ref.invalidate(isBiometricsEnabledProvider);
+      ref.invalidate(allRecordsProvider);
+      ref.invalidate(favoriteRecordsProvider);
+      print('All providers invalidated');
+      
+      // Step 5: Force restart app state
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (!context.mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Complete reset successful! Please wait...'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Step 6: Navigate to setup screen
+      await Future.delayed(const Duration(seconds: 1));
+      
+      if (!context.mounted) return;
+      
+      // Force navigation to setup
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const SetupMasterPasswordScreen(),
+        ),
+        (route) => false,
+      );
+      
+    } catch (e) {
+      if (!context.mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Reset failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      
+      // If all else fails, force navigation to setup
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const SetupMasterPasswordScreen(),
+        ),
+        (route) => false,
+      );
+    }
   }
 }
 
@@ -303,8 +350,17 @@ class AuthenticationHandler extends ConsumerWidget {
         print('Master password check error: $error');
         print('Stack trace: $stack');
         
-        // On error, assume no master password and show setup
-        return const SetupMasterPasswordScreen();
+        // On error, force show setup screen (safer fallback)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => const SetupMasterPasswordScreen(),
+            ),
+            (route) => false,
+          );
+        });
+        
+        return const LoadingScreen();
       },
     );
   }

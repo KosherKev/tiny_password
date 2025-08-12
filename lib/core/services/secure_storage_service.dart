@@ -220,6 +220,7 @@ class SecureStorageService {
   Future<String?> getMasterPasswordHash() async {
     try {
       final hash = await _read(_keyMasterPassword);
+      print('Master password hash value: $hash');
       print('Master password hash retrieved: ${hash != null ? 'found' : 'not found'}');
       return hash;
     } catch (e) {
@@ -299,7 +300,6 @@ class SecureStorageService {
         try {
           await _storage!.deleteAll();
           print('Secure storage cleared successfully');
-          return;
         } catch (e) {
           print('Secure storage deleteAll failed, falling back: $e');
           _useSecureStorage = false;
@@ -320,6 +320,14 @@ class SecureStorageService {
         }
         print('SharedPreferences cleared successfully');
       }
+      
+      // Reset instance state after clearing storage
+      _initialized = false;
+      _storage = null;
+      _prefs = null;
+      _useSecureStorage = true;
+      await _initStorage();
+      
     } catch (e) {
       print('Failed to clear storage: $e');
       throw Exception('Failed to clear storage: $e');

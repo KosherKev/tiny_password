@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:path/path.dart';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'dart:io' show File, Directory, Platform;
+import 'package:path/path.dart' show join, dirname;
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite_sqlcipher/sqflite.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/encryption/encryption_service.dart';
 import '../../core/services/secure_storage_service.dart';
@@ -33,6 +33,26 @@ class SQLiteRecordRepository implements RecordRepository {
       print('Repository disposed successfully');
     } catch (e) {
       print('Error disposing repository: $e');
+    }
+  }
+
+  /// Delete the database file completely
+  Future<void> deleteDatabase() async {
+    try {
+      // First dispose of any open connections
+      await dispose();
+      
+      // Then delete the file if it exists
+      if (_databasePath != null) {
+        final dbFile = File(_databasePath!);
+        if (await dbFile.exists()) {
+          await dbFile.delete();
+          print('Database file deleted successfully');
+        }
+      }
+    } catch (e) {
+      print('Error deleting database file: $e');
+      throw Exception('Failed to delete database file: $e');
     }
   }
 
@@ -171,7 +191,7 @@ class SQLiteRecordRepository implements RecordRepository {
             throw Exception('Database is not functional: $e');
           }
         },
-        password: dbPassword,
+        password: dbPassword, // Using password parameter for SQLCipher encryption
       );
       
       return db;
@@ -186,6 +206,9 @@ class SQLiteRecordRepository implements RecordRepository {
     try {
       print('Attempting database recovery...');
       
+      // First close any open database connections
+      await dispose();
+      
       // Check if file exists
       final file = File(path);
       if (await file.exists()) {
@@ -197,6 +220,19 @@ class SQLiteRecordRepository implements RecordRepository {
         // Delete the corrupted file
         await file.delete();
         print('Deleted corrupted database file');
+      }
+      
+      // Also check for and delete any temporary database files
+      final dir = Directory(dirname(path));
+      if (await dir.exists()) {
+        final tempFiles = await dir.list().where((entity) =>
+          entity is File && entity.path.contains('tiny_password.db-')
+        ).toList();
+        
+        for (final entity in tempFiles) {
+          await entity.delete();
+          print('Deleted temporary database file: ${entity.path}');
+        }
       }
       
       // Clear the stored database password so a new one will be generated

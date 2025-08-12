@@ -129,6 +129,18 @@ class RepositoryStateNotifier extends StateNotifier<RepositoryState> {
   Future<void> retry() async {
     if (state.status == RepositoryStatus.error) {
       print('Retrying repository initialization...');
+      
+      // Try to clean up any existing database file
+      if (_repository != null) {
+        try {
+          final sqliteRepo = _repository! as SQLiteRecordRepository;
+          await sqliteRepo.deleteDatabase();
+          print('Existing database file deleted during retry');
+        } catch (e) {
+          print('Could not delete existing database file: $e');
+        }
+      }
+      
       await initialize();
     }
   }
