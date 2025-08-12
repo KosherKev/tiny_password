@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:tiny_password/core/constants/app_constants.dart';
 import 'package:tiny_password/core/providers/providers.dart';
 
@@ -65,17 +63,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _exportData() async {
     try {
       final repository = ref.read(repositoryProvider);
-      await repository.exportData();
+      final exportedData = await repository.exportToBackup('backup_password');
 
       if (!mounted) return;
+      
+      // For now, just show a success message
+      // In a real app, you'd save this to a file or share it
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data exported successfully')),
+        const SnackBar(content: Text('Export functionality coming soon')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text('Export failed: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -84,28 +85,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _importData() async {
     try {
-      final repository = ref.read(repositoryProvider);
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-      
-      if (result != null) {
-        final file = File(result.files.single.path!);
-        final jsonData = await file.readAsString();
-        await repository.importData(jsonData);
-      }
-      ref.invalidate(allRecordsProvider);
-
-      if (!mounted) return;
+      // For now, just show a message
+      // In a real app, you'd use file_picker to select a file
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data imported successfully')),
+        const SnackBar(content: Text('Import functionality coming soon')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text('Import failed: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );

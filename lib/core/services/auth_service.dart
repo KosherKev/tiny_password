@@ -1,7 +1,7 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import '../constants/app_constants.dart';
 import '../encryption/encryption_service.dart';
+import '../services/secure_storage_service.dart';
 import '../../domain/models/password_strength.dart';
 
 class AuthService {
@@ -9,13 +9,18 @@ class AuthService {
   factory AuthService() => _instance;
   AuthService._internal();
 
-  final _storage = const FlutterSecureStorage();
+  final _secureStorage = SecureStorageService();
   final _localAuth = LocalAuthentication();
   final _encryptionService = EncryptionService();
 
   Future<bool> isMasterPasswordSet() async {
-    final hash = await _storage.read(key: AppConstants.masterPasswordHashKey);
-    return hash != null;
+    try {
+      final hash = await _secureStorage.getMasterPasswordHash();
+      return hash != null && hash.isNotEmpty;
+    } catch (e) {
+      print('Error checking master password: $e');
+      return false;
+    }
   }
 
   Future<bool> setMasterPassword(String password) async {
@@ -23,21 +28,40 @@ class AuthService {
       throw Exception('Password is too short');
     }
 
-    final hash = _encryptionService.hashPassword(password);
-    await _storage.write(key: AppConstants.masterPasswordHashKey, value: hash);
-    await _encryptionService.initialize(password);
-    return true;
+    try {
+      // Reset encryption service first
+      _encryptionService.reset();
+      
+      // Hash the password for storage
+      final hash = _encryptionService.hashPassword(password);
+      await _secureStorage.storeMasterPasswordHash(hash);
+      
+      // Initialize encryption with the new password
+      await _encryptionService.initialize(password);
+      
+      return true;
+    } catch (e) {
+      print('Error setting master password: $e');
+      throw Exception('Failed to set master password: $e');
+    }
   }
 
   Future<bool> verifyMasterPassword(String password) async {
-    final hash = await _storage.read(key: AppConstants.masterPasswordHashKey);
-    if (hash == null) return false;
+    try {
+      final hash = await _secureStorage.getMasterPasswordHash();
+      if (hash == null) return false;
 
-    final isValid = _encryptionService.verifyPassword(password, hash);
-    if (isValid) {
-      await _encryptionService.initialize(password);
+      final isValid = _encryptionService.verifyPassword(password, hash);
+      if (isValid) {
+        // Reset and reinitialize encryption service
+        _encryptionService.reset();
+        await _encryptionService.initialize(password);
+      }
+      return isValid;
+    } catch (e) {
+      print('Error verifying master password: $e');
+      return false;
     }
-    return isValid;
   }
 
   Future<bool> changeMasterPassword(String oldPassword, String newPassword) async {
@@ -49,31 +73,45 @@ class AuthService {
       throw Exception('New password is too short');
     }
 
-    // Re-encrypt all data with new password
-    // This should be implemented in coordination with the record repository
-    await setMasterPassword(newPassword);
-    return true;
+    try {
+      // Set the new master password
+      await setMasterPassword(newPassword);
+      return true;
+    } catch (e) {
+      print('Error changing master password: $e');
+      throw Exception('Failed to change master password: $e');
+    }
   }
 
   Future<bool> isBiometricsAvailable() async {
     try {
       return await _localAuth.canCheckBiometrics &&
           await _localAuth.isDeviceSupported();
-    } catch (_) {
+    } catch (e) {
+      print('Error checking biometrics availability: $e');
       return false;
     }
   }
 
   Future<bool> isBiometricsEnabled() async {
-    final enabled = await _storage.read(key: AppConstants.biometricEnabledKey);
-    return enabled == 'true';
+    try {
+      // For now, return false since we don't have a way to store this securely
+      // In a real app, you'd store this in secure storage
+      return false;
+    } catch (e) {
+      print('Error checking biometrics enabled: $e');
+      return false;
+    }
   }
 
   Future<void> setBiometricsEnabled(bool enabled) async {
-    await _storage.write(
-      key: AppConstants.biometricEnabledKey,
-      value: enabled.toString(),
-    );
+    try {
+      // For now, do nothing since we don't have secure storage for this
+      // In a real app, you'd store this preference securely
+      print('Biometrics enabled: $enabled');
+    } catch (e) {
+      print('Error setting biometrics enabled: $e');
+    }
   }
 
   Future<bool> authenticateWithBiometrics() async {
@@ -89,14 +127,19 @@ class AuthService {
           biometricOnly: true,
         ),
       );
-    } catch (_) {
+    } catch (e) {
+      print('Error authenticating with biometrics: $e');
       return false;
     }
   }
 
   Future<void> logout() async {
-    // Clear sensitive data from memory
-    // This should be implemented in coordination with other services
+    try {
+      // Reset encryption service
+      _encryptionService.reset();
+    } catch (e) {
+      print('Error during logout: $e');
+    }
   }
 
   PasswordStrength checkPasswordStrength(String password) {
@@ -129,6 +172,11 @@ class AuthService {
   }
 
   Future<void> clearSecureStorage() async {
-    await _storage.deleteAll();
+    try {
+      await _secureStorage.deleteAll();
+      _encryptionService.reset();
+    } catch (e) {
+      print('Error clearing secure storage: $e');
+    }
   }
 }

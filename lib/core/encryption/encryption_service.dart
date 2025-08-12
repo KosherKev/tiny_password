@@ -10,15 +10,27 @@ class EncryptionService {
   factory EncryptionService() => _instance;
   EncryptionService._internal();
 
-  late final IV _iv;
-  late final Encrypter _encrypter;
+  IV? _iv;
+  Encrypter? _encrypter;
+  bool _isInitialized = false;
 
   /// Initialize the encryption service with a master password
   Future<void> initialize(String masterPassword) async {
+    // Don't reinitialize if already done
+    if (_isInitialized) return;
+    
     final salt = _generateSalt();
     final key = await _deriveKey(masterPassword, salt);
     _iv = IV.fromSecureRandom(16);
     _encrypter = Encrypter(AES(Key.fromBase64(base64.encode(key))));
+    _isInitialized = true;
+  }
+
+  /// Reset the encryption service (useful for changing master password)
+  void reset() {
+    _iv = null;
+    _encrypter = null;
+    _isInitialized = false;
   }
 
   /// Generate a random salt for key derivation
@@ -93,14 +105,20 @@ class EncryptionService {
 
   /// Encrypt data
   String encrypt(String data) {
-    final encrypted = _encrypter.encrypt(data, iv: _iv);
+    if (!_isInitialized || _encrypter == null || _iv == null) {
+      throw Exception('EncryptionService not initialized');
+    }
+    final encrypted = _encrypter!.encrypt(data, iv: _iv!);
     return encrypted.base64;
   }
 
   /// Decrypt data
   String decrypt(String encryptedData) {
+    if (!_isInitialized || _encrypter == null || _iv == null) {
+      throw Exception('EncryptionService not initialized');
+    }
     final encrypted = Encrypted.fromBase64(encryptedData);
-    return _encrypter.decrypt(encrypted, iv: _iv);
+    return _encrypter!.decrypt(encrypted, iv: _iv!);
   }
 
   /// Generate a secure random password

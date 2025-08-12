@@ -9,18 +9,6 @@ import '../../domain/models/record.dart';
 import '../../domain/repositories/record_repository.dart';
 
 class SQLiteRecordRepository implements RecordRepository {
-  static final SQLiteRecordRepository _instance = SQLiteRecordRepository._internal();
-  factory SQLiteRecordRepository() => _instance;
-  SQLiteRecordRepository._internal();
-
-  Future<void> dispose() async {
-    if (_database != null) {
-      await _database!.close();
-      _database = null;
-    }
-    _isInitialized = false;
-  }
-
   Database? _database;
   final EncryptionService _encryptionService = EncryptionService();
   final SecureStorageService _secureStorage = SecureStorageService();
@@ -30,6 +18,15 @@ class SQLiteRecordRepository implements RecordRepository {
     if (!_isInitialized) throw Exception('Repository not initialized');
     if (_database == null) throw Exception('Database not initialized');
     return _database!;
+  }
+
+  @override
+  Future<void> dispose() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+    _isInitialized = false;
   }
 
   Future<void> initialize() async {
@@ -50,7 +47,7 @@ class SQLiteRecordRepository implements RecordRepository {
         await _secureStorage.storeDatabasePassword(dbPassword);
       }
 
-      // Initialize encryption service
+      // Initialize encryption service with database password
       await _encryptionService.initialize(dbPassword);
 
       // Initialize database
@@ -202,14 +199,15 @@ class SQLiteRecordRepository implements RecordRepository {
   @override
   Future<Record> updateRecord(Record record) async {
     final db = await database;
-    final encryptedRecord = _encryptRecord(record);
+    final updatedRecord = record.copyWith(modifiedAt: DateTime.now());
+    final encryptedRecord = _encryptRecord(updatedRecord);
     await db.update(
       'records',
       encryptedRecord,
       where: 'id = ?',
       whereArgs: [record.id],
     );
-    return record;
+    return updatedRecord;
   }
 
   @override
@@ -230,22 +228,26 @@ class SQLiteRecordRepository implements RecordRepository {
 
   @override
   Future<Record> toggleFavorite(String id) async {
-    final db = await database;
     final record = await getRecordById(id);
     if (record == null) throw Exception('Record not found');
 
-    final updatedRecord = record.copyWith(isFavorite: !record.isFavorite);
+    final updatedRecord = record.copyWith(
+      isFavorite: !record.isFavorite,
+      modifiedAt: DateTime.now(),
+    );
     await updateRecord(updatedRecord);
     return updatedRecord;
   }
 
   @override
   Future<Record> moveToCategory(String id, String category) async {
-    final db = await database;
     final record = await getRecordById(id);
     if (record == null) throw Exception('Record not found');
 
-    final updatedRecord = record.copyWith(category: category);
+    final updatedRecord = record.copyWith(
+      category: category,
+      modifiedAt: DateTime.now(),
+    );
     await updateRecord(updatedRecord);
     return updatedRecord;
   }
@@ -267,10 +269,10 @@ class SQLiteRecordRepository implements RecordRepository {
     if (deleteRecords) {
       batch.delete('records', where: 'category = ?', whereArgs: [category]);
     } else {
-      // Move records to 'Uncategorized' category
+      // Move records to 'Other' category
       batch.update(
         'records',
-        {'category': 'Uncategorized'},
+        {'category': 'Other'},
         where: 'category = ?',
         whereArgs: [category],
       );

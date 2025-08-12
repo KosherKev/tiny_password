@@ -7,6 +7,103 @@ import 'presentation/screens/auth/setup_master_password_screen.dart';
 import 'presentation/screens/auth/unlock_screen.dart';
 import 'presentation/screens/common/loading_screen.dart';
 
+// Temporary debug screen
+class DebugClearDataScreen extends ConsumerWidget {
+  const DebugClearDataScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Debug - Clear Data'),
+        automaticallyImplyLeading: false,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Debug Mode',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'The app detected existing data. Use the button below to clear everything and start fresh.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 40),
+            
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                try {
+                  // Clear auth service data
+                  final authService = ref.read(authServiceProvider);
+                  await authService.clearSecureStorage();
+                  
+                  // Clear repository data if possible
+                  try {
+                    final repository = ref.read(repositoryProvider);
+                    await repository.clearAllData();
+                  } catch (e) {
+                    print('Could not clear repository data: $e');
+                  }
+                  
+                  // Invalidate all providers to force refresh
+                  ref.invalidate(hasMasterPasswordProvider);
+                  ref.invalidate(repositoryStateProvider);
+                  
+                  if (!context.mounted) return;
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Data cleared! App will restart...'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  
+                  // Force app restart by invalidating everything
+                  await Future.delayed(const Duration(seconds: 1));
+                  ref.read(repositoryStateProvider.notifier).initialize();
+                  
+                } catch (e) {
+                  if (!context.mounted) return;
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Clear All Data & Restart'),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            ElevatedButton(
+              onPressed: () {
+                // Force navigate to setup screen
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => const SetupMasterPasswordScreen(),
+                  ),
+                );
+              },
+              child: const Text('Force Go to Setup'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const ProviderScope(child: TinyPasswordApp()));
@@ -53,7 +150,7 @@ class AppHome extends ConsumerWidget {
     ref.listen(repositoryStateProvider, (previous, next) {
       if (next.status == RepositoryStatus.error) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${next.error}'))
+          SnackBar(content: Text('Repository Error: ${next.error}'))
         );
       }
     });
@@ -67,11 +164,25 @@ class AppHome extends ConsumerWidget {
 
     // Once repository is initialized, handle authentication flow
     return ref.watch(hasMasterPasswordProvider).when(
-      data: (hasPassword) => hasPassword 
-        ? const UnlockScreen() 
-        : const SetupMasterPasswordScreen(),
+      data: (hasPassword) {
+        print('Has master password: $hasPassword'); // Debug log
+        
+        // TEMPORARY: Show debug screen if there's a mismatch
+        // Remove this in production
+        if (hasPassword) {
+          return const DebugClearDataScreen();
+        }
+        
+        return hasPassword 
+          ? const UnlockScreen() 
+          : const SetupMasterPasswordScreen();
+      },
       loading: () => const LoadingScreen(),
-      error: (_, __) => const SetupMasterPasswordScreen(),
+      error: (error, stack) {
+        print('Auth check error: $error'); // Debug log
+        // On error, assume no master password is set
+        return const SetupMasterPasswordScreen();
+      },
     );
   }
 }

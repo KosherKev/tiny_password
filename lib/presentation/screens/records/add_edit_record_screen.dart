@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/providers/providers.dart';
 import '../../../domain/models/record.dart';
 import '../../widgets/custom_text_field.dart';
@@ -28,8 +29,10 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen> {
   final _accountNumberController = TextEditingController();
   final _routingNumberController = TextEditingController();
   final _notesController = TextEditingController();
+  String _selectedCategory = 'Personal';
   bool _isFavorite = false;
   bool _showPassword = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -58,43 +61,56 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen> {
   Future<void> _loadRecord() async {
     if (widget.recordId == null) return;
 
-    final record = await ref.read(selectedRecordProvider(widget.recordId!).future);
-    if (record == null) return;
+    try {
+      final record = await ref.read(selectedRecordProvider(widget.recordId!).future);
+      if (record == null) return;
 
-    setState(() {
-      _selectedType = record.type;
-      _titleController.text = record.title;
-      _notesController.text = record.notes ?? '';
-      _isFavorite = record.isFavorite;
+      setState(() {
+        _selectedType = record.type;
+        _titleController.text = record.title;
+        _notesController.text = record.notes ?? '';
+        _selectedCategory = record.category ?? 'Personal';
+        _isFavorite = record.isFavorite;
 
-      switch (record.type) {
-        case RecordType.login:
-          final fields = record.fields;
-          _usernameController.text = fields['username'] ?? '';
-          _passwordController.text = fields['password'] ?? '';
-          _urlController.text = fields['url'] ?? '';
-          break;
-        case RecordType.creditCard:
-          final fields = record.fields;
-          _cardNumberController.text = fields['cardNumber'] ?? '';
-          _cardHolderController.text = fields['cardHolder'] ?? '';
-          _expiryDateController.text = fields['expiryDate'] ?? '';
-          _cvvController.text = fields['cvv'] ?? '';
-          break;
-        case RecordType.bankAccount:
-          final fields = record.fields;
-          _bankNameController.text = fields['bankName'] ?? '';
-          _accountNumberController.text = fields['accountNumber'] ?? '';
-          _routingNumberController.text = fields['routingNumber'] ?? '';
-          break;
-        case RecordType.note:
-          break;
-      }
-    });
+        switch (record.type) {
+          case RecordType.login:
+            final fields = record.fields;
+            _usernameController.text = fields['username'] ?? '';
+            _passwordController.text = fields['password'] ?? '';
+            _urlController.text = fields['url'] ?? '';
+            break;
+          case RecordType.creditCard:
+            final fields = record.fields;
+            _cardNumberController.text = fields['cardNumber'] ?? '';
+            _cardHolderController.text = fields['cardHolder'] ?? '';
+            _expiryDateController.text = fields['expiryDate'] ?? '';
+            _cvvController.text = fields['cvv'] ?? '';
+            break;
+          case RecordType.bankAccount:
+            final fields = record.fields;
+            _bankNameController.text = fields['bankName'] ?? '';
+            _accountNumberController.text = fields['accountNumber'] ?? '';
+            _routingNumberController.text = fields['routingNumber'] ?? '';
+            break;
+          case RecordType.note:
+            break;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading record: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   Future<void> _saveRecord() async {
     if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
 
     try {
       final repository = ref.read(repositoryProvider);
@@ -121,15 +137,17 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen> {
           break;
       }
 
+      final now = DateTime.now();
       final record = Record(
-        id: widget.recordId ?? '',
+        id: widget.recordId ?? const Uuid().v4(),
         type: _selectedType,
         title: _titleController.text,
         fields: fields,
         notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+        category: _selectedCategory,
         isFavorite: _isFavorite,
-        createdAt: DateTime.now(),
-        modifiedAt: DateTime.now(),
+        createdAt: now,
+        modifiedAt: now,
       );
 
       if (widget.recordId != null) {
@@ -138,15 +156,32 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen> {
         await repository.createRecord(record);
       }
 
+      // Invalidate providers to refresh data
+      ref.invalidate(allRecordsProvider);
+      ref.invalidate(favoriteRecordsProvider);
+      if (widget.recordId != null) {
+        ref.invalidate(selectedRecordProvider(widget.recordId!));
+      }
+
       if (!mounted) return;
-      Navigator.of(context).pop();
-    } catch (e) {
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text(widget.recordId == null ? 'Record created' : 'Record updated'),
+        ),
+      );
+      
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving record: $e'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -320,6 +355,25 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen> {
                   value?.isEmpty == true ? 'Please enter a title' : null,
             ),
             const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedCategory,
+              decoration: const InputDecoration(
+                labelText: 'Category',
+                border: OutlineInputBorder(),
+              ),
+              items: ['Personal', 'Work', 'Finance', 'Shopping', 'Social', 'Other']
+                  .map((category) => DropdownMenuItem(
+                        value: category,
+                        child: Text(category),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedCategory = value);
+                }
+              },
+            ),
+            const SizedBox(height: 16),
             if (_selectedType == RecordType.login) _buildLoginFields(),
             if (_selectedType == RecordType.creditCard) _buildCreditCardFields(),
             if (_selectedType == RecordType.bankAccount) _buildBankAccountFields(),
@@ -333,8 +387,14 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _saveRecord,
-        child: const Icon(Icons.save),
+        onPressed: _isLoading ? null : _saveRecord,
+        child: _isLoading 
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.save),
       ),
     );
   }

@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/auth_service.dart';
 import '../services/navigation_service.dart';
 import '../utils/crypto_utils.dart';
-import '../repositories/sqlite_record_repository.dart';
+import '../../data/repositories/sqlite_record_repository.dart';
 import '../../domain/models/record.dart' show Record;
 
 // Service Providers
@@ -41,14 +41,13 @@ class RepositoryState {
 
 // Repository Providers
 final repositoryStateProvider = StateNotifierProvider<RepositoryStateNotifier, RepositoryState>((ref) {
-  return RepositoryStateNotifier(ref);
+  return RepositoryStateNotifier();
 });
 
 class RepositoryStateNotifier extends StateNotifier<RepositoryState> {
-  final Ref _ref;
   SQLiteRecordRepository? _repository;
 
-  RepositoryStateNotifier(this._ref) : super(const RepositoryState(status: RepositoryStatus.uninitialized));
+  RepositoryStateNotifier() : super(const RepositoryState(status: RepositoryStatus.uninitialized));
 
   Future<void> initialize() async {
     if (state.status == RepositoryStatus.initializing) return;
@@ -60,8 +59,7 @@ class RepositoryStateNotifier extends StateNotifier<RepositoryState> {
 
     try {
       _repository?.dispose();
-      final cryptoUtils = _ref.read(cryptoUtilsProvider);
-      _repository = SQLiteRecordRepository(cryptoUtils);
+      _repository = SQLiteRecordRepository();
       await _repository!.initialize();
 
       state = state.copyWith(
@@ -102,8 +100,6 @@ final repositoryProvider = Provider<SQLiteRecordRepository>((ref) {
   }
   return state.repository!;
 });
-
-
 
 // State Providers
 final hasMasterPasswordProvider = FutureProvider<bool>((ref) async {
