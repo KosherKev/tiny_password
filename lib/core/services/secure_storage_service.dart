@@ -11,33 +11,65 @@ class SecureStorageService {
   FlutterSecureStorage? _storage;
   SharedPreferences? _prefs;
   bool _useSecureStorage = true;
+  bool _initialized = false;
 
   static const _keyDatabasePassword = 'database_password';
   static const _keyMasterPassword = 'master_password_hash';
   static const _keyEncryptionKey = 'encryption_key';
   static const _keyIV = 'encryption_iv';
+  static const _keyBiometricsEnabled = 'biometrics_enabled';
 
   Future<void> _initStorage() async {
+    if (_initialized) return;
+    
     try {
-      _storage = const FlutterSecureStorage(
-        aOptions: AndroidOptions(encryptedSharedPreferences: true),
-        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+      print('Initializing secure storage...');
+      
+      // Configure secure storage with platform-specific options
+      AndroidOptions androidOptions = const AndroidOptions(
+        encryptedSharedPreferences: true,
+        keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
+        storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
+      );
+      
+      IOSOptions iosOptions = const IOSOptions(
+        accessibility: KeychainAccessibility.first_unlock_this_device,
+      );
+      
+      _storage = FlutterSecureStorage(
+        aOptions: androidOptions,
+        iOptions: iosOptions,
       );
       
       // Test if secure storage works
       await _storage!.write(key: 'test_key', value: 'test_value');
+      final testValue = await _storage!.read(key: 'test_key');
       await _storage!.delete(key: 'test_key');
+      
+      if (testValue == 'test_value') {
+        print('Secure storage test successful');
+        _useSecureStorage = true;
+      } else {
+        throw Exception('Secure storage test failed');
+      }
     } catch (e) {
       print('Secure storage not available, falling back to SharedPreferences: $e');
       _useSecureStorage = false;
-      _prefs = await SharedPreferences.getInstance();
+      
+      try {
+        _prefs = await SharedPreferences.getInstance();
+        print('SharedPreferences fallback initialized');
+      } catch (e2) {
+        print('Failed to initialize SharedPreferences: $e2');
+        throw Exception('No storage method available: $e2');
+      }
     }
+    
+    _initialized = true;
   }
 
   Future<void> _write(String key, String value) async {
-    if (_storage == null && _prefs == null) {
-      await _initStorage();
-    }
+    await _initStorage();
 
     if (_useSecureStorage && _storage != null) {
       try {
@@ -52,19 +84,28 @@ class SecureStorageService {
 
     // Fallback to SharedPreferences with basic encoding
     if (_prefs != null) {
-      final encoded = base64.encode(utf8.encode(value));
-      await _prefs!.setString(key, encoded);
+      try {
+        final encoded = base64.encode(utf8.encode(value));
+        await _prefs!.setString(key, encoded);
+        print('Stored $key using SharedPreferences fallback');
+      } catch (e) {
+        print('SharedPreferences write failed: $e');
+        throw Exception('Failed to store data: $e');
+      }
+    } else {
+      throw Exception('No storage method available');
     }
   }
 
   Future<String?> _read(String key) async {
-    if (_storage == null && _prefs == null) {
-      await _initStorage();
-    }
+    await _initStorage();
 
     if (_useSecureStorage && _storage != null) {
       try {
-        return await _storage!.read(key: key);
+        final value = await _storage!.read(key: key);
+        if (value != null) {
+          return value;
+        }
       } catch (e) {
         print('Secure storage read failed, falling back: $e');
         _useSecureStorage = false;
@@ -74,14 +115,71 @@ class SecureStorageService {
 
     // Fallback to SharedPreferences
     if (_prefs != null) {
-      final encoded = _prefs!.getString(key);
-      if (encoded != null) {
-        try {
+      try {
+        final encoded = _prefs!.getString(key);
+        if (encoded != null) {
           return utf8.decode(base64.decode(encoded));
-        } catch (e) {
-          print('Failed to decode stored value: $e');
-          return null;
         }
+      } catch (e) {
+        print('SharedPreferences read failed for key $key: $e');
+        return null;
+      }
+    }
+
+    return null;
+  }
+
+  Future<bool> _writeBool(String key, bool value) async {
+    await _initStorage();
+
+    if (_useSecureStorage && _storage != null) {
+      try {
+        await _storage!.write(key: key, value: value.toString());
+        return true;
+      } catch (e) {
+        print('Secure storage bool write failed, falling back: $e');
+        _useSecureStorage = false;
+        _prefs ??= await SharedPreferences.getInstance();
+      }
+    }
+
+    // Fallback to SharedPreferences
+    if (_prefs != null) {
+      try {
+        await _prefs!.setBool(key, value);
+        return true;
+      } catch (e) {
+        print('SharedPreferences bool write failed: $e');
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  Future<bool?> _readBool(String key) async {
+    await _initStorage();
+
+    if (_useSecureStorage && _storage != null) {
+      try {
+        final value = await _storage!.read(key: key);
+        if (value != null) {
+          return value.toLowerCase() == 'true';
+        }
+      } catch (e) {
+        print('Secure storage bool read failed, falling back: $e');
+        _useSecureStorage = false;
+        _prefs ??= await SharedPreferences.getInstance();
+      }
+    }
+
+    // Fallback to SharedPreferences
+    if (_prefs != null) {
+      try {
+        return _prefs!.getBool(key);
+      } catch (e) {
+        print('SharedPreferences bool read failed for key $key: $e');
+        return null;
       }
     }
 
@@ -89,64 +187,164 @@ class SecureStorageService {
   }
 
   Future<void> storeDatabasePassword(String password) async {
-    await _write(_keyDatabasePassword, password);
+    try {
+      await _write(_keyDatabasePassword, password);
+      print('Database password stored successfully');
+    } catch (e) {
+      print('Failed to store database password: $e');
+      throw Exception('Failed to store database password: $e');
+    }
   }
 
   Future<String?> getDatabasePassword() async {
-    return await _read(_keyDatabasePassword);
+    try {
+      final password = await _read(_keyDatabasePassword);
+      print('Database password retrieved: ${password != null ? 'found' : 'not found'}');
+      return password;
+    } catch (e) {
+      print('Failed to get database password: $e');
+      return null;
+    }
   }
 
   Future<void> storeMasterPasswordHash(String hash) async {
-    await _write(_keyMasterPassword, hash);
+    try {
+      await _write(_keyMasterPassword, hash);
+      print('Master password hash stored successfully');
+    } catch (e) {
+      print('Failed to store master password hash: $e');
+      throw Exception('Failed to store master password hash: $e');
+    }
   }
 
   Future<String?> getMasterPasswordHash() async {
-    return await _read(_keyMasterPassword);
+    try {
+      final hash = await _read(_keyMasterPassword);
+      print('Master password hash retrieved: ${hash != null ? 'found' : 'not found'}');
+      return hash;
+    } catch (e) {
+      print('Failed to get master password hash: $e');
+      return null;
+    }
   }
 
   Future<void> storeEncryptionKey(String key) async {
-    await _write(_keyEncryptionKey, key);
+    try {
+      await _write(_keyEncryptionKey, key);
+      print('Encryption key stored successfully');
+    } catch (e) {
+      print('Failed to store encryption key: $e');
+      throw Exception('Failed to store encryption key: $e');
+    }
   }
 
   Future<String?> getEncryptionKey() async {
-    return await _read(_keyEncryptionKey);
+    try {
+      final key = await _read(_keyEncryptionKey);
+      print('Encryption key retrieved: ${key != null ? 'found' : 'not found'}');
+      return key;
+    } catch (e) {
+      print('Failed to get encryption key: $e');
+      return null;
+    }
   }
 
   Future<void> storeIV(String iv) async {
-    await _write(_keyIV, iv);
+    try {
+      await _write(_keyIV, iv);
+      print('IV stored successfully');
+    } catch (e) {
+      print('Failed to store IV: $e');
+      throw Exception('Failed to store IV: $e');
+    }
   }
 
   Future<String?> getIV() async {
-    return await _read(_keyIV);
+    try {
+      final iv = await _read(_keyIV);
+      print('IV retrieved: ${iv != null ? 'found' : 'not found'}');
+      return iv;
+    } catch (e) {
+      print('Failed to get IV: $e');
+      return null;
+    }
+  }
+
+  Future<void> setBiometricsEnabled(bool enabled) async {
+    try {
+      await _writeBool(_keyBiometricsEnabled, enabled);
+      print('Biometrics enabled preference stored: $enabled');
+    } catch (e) {
+      print('Failed to store biometrics preference: $e');
+      throw Exception('Failed to store biometrics preference: $e');
+    }
+  }
+
+  Future<bool?> getBiometricsEnabled() async {
+    try {
+      final enabled = await _readBool(_keyBiometricsEnabled);
+      print('Biometrics enabled preference retrieved: ${enabled ?? 'not set'}');
+      return enabled;
+    } catch (e) {
+      print('Failed to get biometrics preference: $e');
+      return null;
+    }
   }
 
   Future<void> deleteAll() async {
-    if (_useSecureStorage && _storage != null) {
-      try {
-        await _storage!.deleteAll();
-        return;
-      } catch (e) {
-        print('Secure storage deleteAll failed, falling back: $e');
-        _useSecureStorage = false;
-        _prefs ??= await SharedPreferences.getInstance();
+    try {
+      await _initStorage();
+      
+      if (_useSecureStorage && _storage != null) {
+        try {
+          await _storage!.deleteAll();
+          print('Secure storage cleared successfully');
+          return;
+        } catch (e) {
+          print('Secure storage deleteAll failed, falling back: $e');
+          _useSecureStorage = false;
+          _prefs ??= await SharedPreferences.getInstance();
+        }
       }
-    }
 
-    if (_prefs != null) {
-      final keys = [
-        _keyDatabasePassword,
-        _keyMasterPassword,
-        _keyEncryptionKey,
-        _keyIV,
-      ];
-      for (final key in keys) {
-        await _prefs!.remove(key);
+      if (_prefs != null) {
+        final keys = [
+          _keyDatabasePassword,
+          _keyMasterPassword,
+          _keyEncryptionKey,
+          _keyIV,
+          _keyBiometricsEnabled,
+        ];
+        for (final key in keys) {
+          await _prefs!.remove(key);
+        }
+        print('SharedPreferences cleared successfully');
       }
+    } catch (e) {
+      print('Failed to clear storage: $e');
+      throw Exception('Failed to clear storage: $e');
     }
   }
 
   Future<bool> hasMasterPassword() async {
-    final hash = await getMasterPasswordHash();
-    return hash != null;
+    try {
+      final hash = await getMasterPasswordHash();
+      return hash != null && hash.isNotEmpty;
+    } catch (e) {
+      print('Failed to check master password: $e');
+      return false;
+    }
+  }
+
+  /// Check if secure storage is being used (for debugging)
+  bool get isUsingSecureStorage => _useSecureStorage;
+
+  /// Force reinitialization (for testing)
+  Future<void> reinitialize() async {
+    _initialized = false;
+    _storage = null;
+    _prefs = null;
+    _useSecureStorage = true;
+    await _initStorage();
   }
 }

@@ -16,7 +16,9 @@ class AuthService {
   Future<bool> isMasterPasswordSet() async {
     try {
       final hash = await _secureStorage.getMasterPasswordHash();
-      return hash != null && hash.isNotEmpty;
+      final result = hash != null && hash.isNotEmpty;
+      print('Master password check: ${result ? 'exists' : 'not set'}');
+      return result;
     } catch (e) {
       print('Error checking master password: $e');
       return false;
@@ -25,38 +27,57 @@ class AuthService {
 
   Future<bool> setMasterPassword(String password) async {
     if (password.length < AppConstants.minPasswordLength) {
-      throw Exception('Password is too short');
+      throw Exception('Password is too short (minimum ${AppConstants.minPasswordLength} characters)');
     }
 
     try {
+      print('Setting new master password...');
+      
       // Reset encryption service first
       _encryptionService.reset();
       
-      // Hash the password for storage
+      // Hash the password for storage (authentication)
       final hash = _encryptionService.hashPassword(password);
       await _secureStorage.storeMasterPasswordHash(hash);
+      print('Master password hash stored');
       
-      // Initialize encryption with the new password
-      await _encryptionService.initialize(password);
+      // Initialize encryption with the password (for record encryption)
+      await _encryptionService.initializeWithMasterPassword(password);
+      print('Encryption service initialized with master password');
       
       return true;
     } catch (e) {
       print('Error setting master password: $e');
+      _encryptionService.reset();
       throw Exception('Failed to set master password: $e');
     }
   }
 
   Future<bool> verifyMasterPassword(String password) async {
     try {
+      print('Verifying master password...');
+      
       final hash = await _secureStorage.getMasterPasswordHash();
-      if (hash == null) return false;
+      if (hash == null) {
+        print('No stored master password hash found');
+        return false;
+      }
 
       final isValid = _encryptionService.verifyPassword(password, hash);
+      print('Password verification: ${isValid ? 'success' : 'failed'}');
+      
       if (isValid) {
-        // Reset and reinitialize encryption service
-        _encryptionService.reset();
-        await _encryptionService.initialize(password);
+        // Initialize encryption service for record operations
+        try {
+          _encryptionService.reset();
+          await _encryptionService.initializeWithMasterPassword(password);
+          print('Encryption service initialized after verification');
+        } catch (e) {
+          print('Failed to initialize encryption after verification: $e');
+          throw Exception('Failed to initialize encryption: $e');
+        }
       }
+      
       return isValid;
     } catch (e) {
       print('Error verifying master password: $e');
@@ -65,17 +86,20 @@ class AuthService {
   }
 
   Future<bool> changeMasterPassword(String oldPassword, String newPassword) async {
+    print('Changing master password...');
+    
     if (!await verifyMasterPassword(oldPassword)) {
       throw Exception('Current password is incorrect');
     }
 
     if (newPassword.length < AppConstants.minPasswordLength) {
-      throw Exception('New password is too short');
+      throw Exception('New password is too short (minimum ${AppConstants.minPasswordLength} characters)');
     }
 
     try {
       // Set the new master password
       await setMasterPassword(newPassword);
+      print('Master password changed successfully');
       return true;
     } catch (e) {
       print('Error changing master password: $e');
@@ -85,8 +109,11 @@ class AuthService {
 
   Future<bool> isBiometricsAvailable() async {
     try {
-      return await _localAuth.canCheckBiometrics &&
-          await _localAuth.isDeviceSupported();
+      final isAvailable = await _localAuth.canCheckBiometrics;
+      final isSupported = await _localAuth.isDeviceSupported();
+      final result = isAvailable && isSupported;
+      print('Biometrics availability: $result');
+      return result;
     } catch (e) {
       print('Error checking biometrics availability: $e');
       return false;
@@ -95,9 +122,16 @@ class AuthService {
 
   Future<bool> isBiometricsEnabled() async {
     try {
-      // For now, return false since we don't have a way to store this securely
-      // In a real app, you'd store this in secure storage
-      return false;
+      // Check if biometrics is available first
+      if (!await isBiometricsAvailable()) {
+        return false;
+      }
+      
+      // For now, we'll store this preference in secure storage
+      // In a real implementation, you might want a separate key for this
+      final enabled = await _secureStorage.getBiometricsEnabled();
+      print('Biometrics enabled: ${enabled ?? false}');
+      return enabled ?? false;
     } catch (e) {
       print('Error checking biometrics enabled: $e');
       return false;
@@ -106,27 +140,45 @@ class AuthService {
 
   Future<void> setBiometricsEnabled(bool enabled) async {
     try {
-      // For now, do nothing since we don't have secure storage for this
-      // In a real app, you'd store this preference securely
-      print('Biometrics enabled: $enabled');
+      if (enabled && !await isBiometricsAvailable()) {
+        throw Exception('Biometric authentication is not available on this device');
+      }
+      
+      await _secureStorage.setBiometricsEnabled(enabled);
+      print('Biometrics preference set to: $enabled');
     } catch (e) {
       print('Error setting biometrics enabled: $e');
+      throw Exception('Failed to set biometrics preference: $e');
     }
   }
 
   Future<bool> authenticateWithBiometrics() async {
     if (!await isBiometricsAvailable() || !await isBiometricsEnabled()) {
+      print('Biometrics not available or not enabled');
       return false;
     }
 
     try {
-      return await _localAuth.authenticate(
+      print('Attempting biometric authentication...');
+      final result = await _localAuth.authenticate(
         localizedReason: 'Authenticate to access your passwords',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: true,
         ),
       );
+      
+      print('Biometric authentication result: $result');
+      
+      if (result) {
+        // We still need to initialize encryption with the master password
+        // Since biometrics is just an additional auth layer
+        // We would need to store the master password securely or derive it
+        // For now, we'll just return true and let the app handle initialization
+        print('Biometric authentication successful');
+      }
+      
+      return result;
     } catch (e) {
       print('Error authenticating with biometrics: $e');
       return false;
@@ -135,8 +187,10 @@ class AuthService {
 
   Future<void> logout() async {
     try {
-      // Reset encryption service
+      print('Logging out...');
+      // Reset encryption service to clear sensitive data from memory
       _encryptionService.reset();
+      print('Logout completed');
     } catch (e) {
       print('Error during logout: $e');
     }
@@ -173,10 +227,19 @@ class AuthService {
 
   Future<void> clearSecureStorage() async {
     try {
+      print('Clearing secure storage...');
       await _secureStorage.deleteAll();
       _encryptionService.reset();
+      print('Secure storage cleared');
     } catch (e) {
       print('Error clearing secure storage: $e');
+      throw Exception('Failed to clear secure storage: $e');
     }
   }
+
+  /// Get encryption service instance (for repository initialization)
+  EncryptionService get encryptionService => _encryptionService;
+
+  /// Check if encryption is ready for record operations
+  bool get isEncryptionReady => _encryptionService.isInitialized;
 }
