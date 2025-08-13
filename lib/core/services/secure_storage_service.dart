@@ -12,6 +12,7 @@ class SecureStorageService {
   bool _useSecureStorage = true;
   bool _initialized = false;
   
+  static const _keyBiometricMasterPassword = 'tiny_password_biometric_master_v2';
   static const _keyEncryptionSalt = 'tiny_password_encryption_salt_v2';
   static const _keyDatabasePassword = 'tiny_password_db_password_v2';
   static const _keyMasterPassword = 'tiny_password_master_hash_v2';
@@ -409,6 +410,27 @@ class SecureStorageService {
       return salt;
     } catch (e) {
       print('Failed to get encryption salt: $e');
+      return null;
+    }
+  }
+
+  Future<void> storeBiometricMasterPassword(String password) async {
+    try {
+      await _write(_keyBiometricMasterPassword, password);
+      print('Biometric master password stored successfully');
+    } catch (e) {
+      print('Failed to store biometric master password: $e');
+      throw Exception('Failed to store biometric master password: $e');
+    }
+  }
+
+  Future<String?> getBiometricMasterPassword() async {
+    try {
+      final password = await _read(_keyBiometricMasterPassword);
+      print('Biometric master password retrieved: ${password != null ? 'found' : 'not found'}');
+      return password;
+    } catch (e) {
+      print('Failed to get biometric master password: $e');
       return null;
     }
   }

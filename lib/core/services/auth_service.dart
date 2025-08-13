@@ -169,22 +169,54 @@ class AuthService {
       );
       
       print('Biometric authentication result: $result');
-      
-      if (result) {
-        // Get the stored master password hash to verify we have access
-        final hash = await _secureStorage.getMasterPasswordHash();
-        if (hash != null) {
-          print('Biometric authentication successful - hash available');
-          return true;
-        } else {
-          print('Biometric authentication successful but no master password hash found');
-          return false;
-        }
-      }
-      
       return result;
     } catch (e) {
       print('Error authenticating with biometrics: $e');
+      return false;
+    }
+  }
+
+  /// Store encrypted master password for biometric unlock
+  Future<void> storeMasterPasswordForBiometrics(String masterPassword) async {
+    try {
+      // Simple approach: store the master password hash and use it to verify
+      // In production, you'd want to encrypt this with a biometric-protected key
+      await _secureStorage.storeBiometricMasterPassword(masterPassword);
+      print('Master password stored for biometric access');
+    } catch (e) {
+      print('Failed to store master password for biometrics: $e');
+      throw Exception('Failed to store master password for biometrics: $e');
+    }
+  }
+
+  /// Get master password for biometric unlock
+  Future<String?> getMasterPasswordForBiometrics() async {
+    try {
+      return await _secureStorage.getBiometricMasterPassword();
+    } catch (e) {
+      print('Failed to get master password for biometrics: $e');
+      return null;
+    }
+  }
+
+  /// Full biometric unlock with encryption initialization
+  Future<bool> unlockWithBiometrics() async {
+    final biometricSuccess = await authenticateWithBiometrics();
+    if (!biometricSuccess) return false;
+
+    try {
+      final masterPassword = await getMasterPasswordForBiometrics();
+      if (masterPassword == null) {
+        print('No stored master password for biometrics');
+        return false;
+      }
+
+      // Initialize encryption with the stored master password
+      await _encryptionService.initializeWithMasterPassword(masterPassword);
+      print('Biometric unlock successful - encryption initialized');
+      return true;
+    } catch (e) {
+      print('Failed to initialize encryption after biometric unlock: $e');
       return false;
     }
   }

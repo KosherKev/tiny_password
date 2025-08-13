@@ -136,6 +136,9 @@ class _SetupMasterPasswordScreenState
         if (shouldEnableBiometrics ?? false) {
           try {
             await authService.setBiometricsEnabled(true);
+            // Store the master password for biometric access
+            await authService.storeMasterPasswordForBiometrics(_passwordController.text);
+            print('Biometrics enabled and master password stored');
           } catch (e) {
             if (mounted) {
               CustomSnackBar.showWarning(

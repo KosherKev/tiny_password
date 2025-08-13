@@ -15,7 +15,7 @@ dependencies:
   flutter_riverpod: ^2.4.0
   
   # Database
-  sqflite_sqlcipher: ^2.3.0
+  sqflite_sqlcipher: ^2.2.1
   
   # Encryption
   encrypt: ^5.0.1

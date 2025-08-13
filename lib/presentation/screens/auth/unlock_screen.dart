@@ -82,22 +82,28 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
       setState(() => _isLoading = true);
 
       final authService = ref.read(authServiceProvider);
-      final success = await authService.authenticateWithBiometrics();
+      final repositoryNotifier = ref.read(repositoryStateProvider.notifier);
+      
+      final success = await authService.unlockWithBiometrics();
 
       if (success && mounted) {
-        // Get the master password hash and initialize encryption
-        final hash = await authService.getMasterPasswordHash();
-        if (hash != null) {
-          // For now, still require password entry after biometric success
-          // TODO: Implement secure master password storage for biometrics
-          CustomSnackBar.showSuccess(
-            context: context,
-            message: 'Biometric authentication successful. Please enter your password to complete unlock.',
-          );
-        } else {
+        // Initialize repository encryption
+        await repositoryNotifier.initializeRecordEncryption(
+          await authService.getMasterPasswordForBiometrics() ?? ''
+        );
+        
+        ref.read(isAuthenticatedProvider.notifier).state = true;
+        
+        ref.read(navigationServiceProvider).navigateToHome();
+        CustomSnackBar.showSuccess(
+          context: context,
+          message: 'Biometric unlock successful!',
+        );
+      } else {
+        if (mounted) {
           CustomSnackBar.showError(
             context: context,
-            message: 'Biometric authentication failed - no stored credentials.',
+            message: 'Biometric authentication failed. Please use your master password.',
           );
         }
       }
@@ -106,7 +112,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
       if (mounted) {
         CustomSnackBar.showError(
           context: context,
-          message: 'Biometric authentication failed.',
+          message: 'Biometric authentication failed. Please use your master password.',
         );
       }
     } finally {
