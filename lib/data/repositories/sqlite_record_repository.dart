@@ -91,27 +91,6 @@ class SQLiteRecordRepository implements RecordRepository {
     }
   }
 
-  /// Get existing database password or create a new one
-  Future<String> _getOrCreateDatabasePassword() async {
-    try {
-      String? dbPassword = await _secureStorage.getDatabasePassword();
-      
-      if (dbPassword == null) {
-        print('Generating new database password');
-        dbPassword = _encryptionService.generateDatabasePassword();
-        await _secureStorage.storeDatabasePassword(dbPassword);
-        print('Database password stored securely');
-      } else {
-        print('Using existing database password');
-      }
-      
-      return dbPassword;
-    } catch (e) {
-      print('Error handling database password: $e');
-      throw Exception('Failed to get database password: $e');
-    }
-  }
-
   /// Get database path with proper platform handling
   Future<String> _getDatabasePath() async {
     try {

@@ -41,14 +41,14 @@ class RepositoryState {
 
 // Repository Providers
 final repositoryStateProvider = StateNotifierProvider<RepositoryStateNotifier, RepositoryState>((ref) {
-  return RepositoryStateNotifier(ref);
+  return RepositoryStateNotifier();
 });
 
 class RepositoryStateNotifier extends StateNotifier<RepositoryState> {
   SQLiteRecordRepository? _repository;
-  final Ref _ref;
+  // final Ref _ref;
 
-  RepositoryStateNotifier(this._ref) : super(const RepositoryState(status: RepositoryStatus.uninitialized));
+  RepositoryStateNotifier() : super(const RepositoryState(status: RepositoryStatus.uninitialized));
 
   Future<void> initialize() async {
     if (state.status == RepositoryStatus.initializing) {
@@ -133,7 +133,7 @@ class RepositoryStateNotifier extends StateNotifier<RepositoryState> {
       // Try to clean up any existing database file
       if (_repository != null) {
         try {
-          final sqliteRepo = _repository! as SQLiteRecordRepository;
+          final sqliteRepo = _repository!;
           await sqliteRepo.deleteDatabase();
           print('Existing database file deleted during retry');
         } catch (e) {

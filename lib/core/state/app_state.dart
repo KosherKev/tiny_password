@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/models/record.dart';
-import '../../data/repositories/sqlite_record_repository.dart';
 import '../providers/providers.dart';
 import '../services/auth_service.dart';
 

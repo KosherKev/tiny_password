@@ -80,7 +80,6 @@ class _CustomButtonState extends State<CustomButton>
 
   @override
   Widget build(BuildContext context) {
-    final bool isEnabled = widget.onPressed != null && !widget.isLoading;
 
     return AnimatedBuilder(
       animation: _scaleAnimation,

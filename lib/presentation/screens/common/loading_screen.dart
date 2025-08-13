@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/providers.dart';
-import '../../../data/repositories/sqlite_record_repository.dart';
 import '../auth/setup_master_password_screen.dart';
 import 'dart:math' as math;
 
@@ -358,7 +357,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
                 final repositoryState = ref.read(repositoryStateProvider);
                 if (repositoryState.repository != null) {
                   try {
-                    final sqliteRepo = repositoryState.repository! as SQLiteRecordRepository;
+                    final sqliteRepo = repositoryState.repository!;
                     await sqliteRepo.deleteDatabase();
                     print('Database file deleted during recovery');
                   } catch (e) {
