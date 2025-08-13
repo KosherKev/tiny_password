@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tiny_password/core/providers/providers.dart';
 import 'core/services/navigation_service.dart';
 import 'core/services/password_generator_service.dart';
-import 'data/repositories/sqlite_record_repository.dart';
 import 'presentation/screens/auth/setup_master_password_screen.dart';
 import 'presentation/screens/auth/unlock_screen.dart';
 import 'presentation/screens/common/loading_screen.dart';
