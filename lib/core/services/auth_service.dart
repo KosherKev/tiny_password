@@ -171,11 +171,15 @@ class AuthService {
       print('Biometric authentication result: $result');
       
       if (result) {
-        // We still need to initialize encryption with the master password
-        // Since biometrics is just an additional auth layer
-        // We would need to store the master password securely or derive it
-        // For now, we'll just return true and let the app handle initialization
-        print('Biometric authentication successful');
+        // Get the stored master password hash to verify we have access
+        final hash = await _secureStorage.getMasterPasswordHash();
+        if (hash != null) {
+          print('Biometric authentication successful - hash available');
+          return true;
+        } else {
+          print('Biometric authentication successful but no master password hash found');
+          return false;
+        }
       }
       
       return result;
@@ -234,6 +238,15 @@ class AuthService {
     } catch (e) {
       print('Error clearing secure storage: $e');
       throw Exception('Failed to clear secure storage: $e');
+    }
+  }
+
+  Future<String?> getMasterPasswordHash() async {
+    try {
+      return await _secureStorage.getMasterPasswordHash();
+    } catch (e) {
+      print('Error getting master password hash: $e');
+      return null;
     }
   }
 

@@ -111,14 +111,26 @@ class _SetupMasterPasswordScreenState
       }
 
       if (mounted && isBiometricsAvailable) {
-        final shouldEnableBiometrics = await CustomDialog.showConfirmationDialog(
+        final shouldEnableBiometrics = await showDialog<bool>(
           context: context,
-          title: 'Enable Biometric Authentication',
-          message:
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Enable Biometric Authentication'),
+            content: const Text(
               'Would you like to enable biometric authentication for quicker access?\n\n'
               'Note: You will still need to enter your master password occasionally for security.',
-          confirmText: 'Enable',
-          cancelText: 'Skip',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Skip'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Enable'),
+              ),
+            ],
+          ),
         );
 
         if (shouldEnableBiometrics ?? false) {

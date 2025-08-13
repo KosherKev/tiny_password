@@ -155,7 +155,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
     setState(() => _isLoading = true);
 
     try {
-      final repository = ref.read(repositoryProvider);
+      final repository = ref.read(safeRepositoryProvider);
       final fields = <String, String>{};
 
       switch (_selectedType) {

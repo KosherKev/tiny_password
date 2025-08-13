@@ -29,7 +29,6 @@ class CustomDialog extends StatelessWidget {
         if (cancelText != null)
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop();
               onCancel?.call();
             },
             child: Text(cancelText!),
@@ -37,7 +36,6 @@ class CustomDialog extends StatelessWidget {
         if (confirmText != null)
           TextButton(
             onPressed: () {
-              Navigator.of(context).pop();
               onConfirm?.call();
             },
             style: isDestructive
@@ -61,14 +59,23 @@ class CustomDialog extends StatelessWidget {
   }) {
     return showDialog<bool>(
       context: context,
-      builder: (context) => CustomDialog(
+      barrierDismissible: false, // Prevent dismissal by tapping outside
+      builder: (dialogContext) => CustomDialog(
         title: title,
         message: message,
         confirmText: confirmText,
         cancelText: cancelText,
         isDestructive: isDestructive,
-        onConfirm: () => Navigator.of(context).pop(true),
-        onCancel: () => Navigator.of(context).pop(false),
+        onConfirm: () {
+          if (Navigator.of(dialogContext).canPop()) {
+            Navigator.of(dialogContext).pop(true);
+          }
+        },
+        onCancel: () {
+          if (Navigator.of(dialogContext).canPop()) {
+            Navigator.of(dialogContext).pop(false);
+          }
+        },
       ),
     );
   }

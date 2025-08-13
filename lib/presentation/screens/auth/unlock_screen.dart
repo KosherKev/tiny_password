@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tiny_password/core/providers/providers.dart';
-import 'package:tiny_password/data/repositories/sqlite_record_repository.dart';
 import 'package:tiny_password/presentation/screens/auth/setup_master_password_screen.dart';
 import 'package:tiny_password/presentation/widgets/custom_button.dart';
 import 'package:tiny_password/presentation/widgets/snackbar.dart';
@@ -86,16 +85,30 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
       final success = await authService.authenticateWithBiometrics();
 
       if (success && mounted) {
-        // For biometric auth, we need to handle the fact that we don't have the actual password
-        // In a real implementation, you'd need to store the master password securely or derive it
-        // For now, we'll show a success message but note this is a limitation
-        CustomSnackBar.showError(
-          context: context,
-          message: 'Biometric authentication succeeded, but master password is required for encryption. Please enter your password.',
-        );
+        // Get the master password hash and initialize encryption
+        final hash = await authService.getMasterPasswordHash();
+        if (hash != null) {
+          // For now, still require password entry after biometric success
+          // TODO: Implement secure master password storage for biometrics
+          CustomSnackBar.showSuccess(
+            context: context,
+            message: 'Biometric authentication successful. Please enter your password to complete unlock.',
+          );
+        } else {
+          CustomSnackBar.showError(
+            context: context,
+            message: 'Biometric authentication failed - no stored credentials.',
+          );
+        }
       }
     } catch (e) {
       print('Biometric authentication error: $e');
+      if (mounted) {
+        CustomSnackBar.showError(
+          context: context,
+          message: 'Biometric authentication failed.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -545,7 +558,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
                 final repositoryState = ref.read(repositoryStateProvider);
                 if (repositoryState.repository != null) {
                   try {
-                    final sqliteRepo = repositoryState.repository! as SQLiteRecordRepository;
+                    final sqliteRepo = repositoryState.repository!;
                     await sqliteRepo.deleteDatabase();
                     print('Database file deleted');
                   } catch (e) {

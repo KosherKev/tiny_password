@@ -274,22 +274,28 @@ class TinyPasswordApp extends ConsumerWidget {
       }
     });
 
-    return MaterialApp(
-      title: 'Tiny Password',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
-        brightness: Brightness.light,
+    return GestureDetector(
+      onTap: () {
+        // Dismiss keyboard when tapping outside of text fields
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+      child: MaterialApp(
+        title: 'Tiny Password',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          colorSchemeSeed: Colors.blue,
+          brightness: Brightness.light,
+        ),
+        darkTheme: ThemeData(
+          useMaterial3: true,
+          colorSchemeSeed: Colors.blue,
+          brightness: Brightness.dark,
+        ),
+        themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+        navigatorKey: NavigationService.navigatorKey,
+        home: const AppHome(),
       ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
-        brightness: Brightness.dark,
-      ),
-      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      navigatorKey: NavigationService.navigatorKey,
-      home: const AppHome(),
     );
   }
 }

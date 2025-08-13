@@ -67,7 +67,11 @@ class SQLiteRecordRepository implements RecordRepository {
       print('Starting repository initialization...');
       
       // Step 1: Get or create database password
-      String? dbPassword = await _getOrCreateDatabasePassword();
+      String? dbPassword = await _secureStorage.getDatabasePassword();
+      if (dbPassword == null) {
+        dbPassword = _encryptionService.generateDatabasePassword();
+        await _secureStorage.storeDatabasePassword(dbPassword);
+      }
       print('Database password obtained');
 
       // Step 2: Get database path with fallback handling

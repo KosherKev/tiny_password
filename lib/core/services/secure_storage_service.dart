@@ -12,7 +12,8 @@ class SecureStorageService {
   SharedPreferences? _prefs;
   bool _useSecureStorage = true;
   bool _initialized = false;
-
+  
+  static const _keyEncryptionSalt = 'tiny_password_encryption_salt_v2';
   static const _keyDatabasePassword = 'tiny_password_db_password_v2';
   static const _keyMasterPassword = 'tiny_password_master_hash_v2';
   static const _keyEncryptionKey = 'tiny_password_encryption_key_v2';
@@ -336,55 +337,6 @@ class SecureStorageService {
     }
   }
 
-  // Future<void> forceDeleteSpecificKeys() async {
-  //   try {
-  //     print('MANUAL KEY DELETION: Starting');
-      
-  //     // Create a fresh storage instance with the same config as used elsewhere
-  //     AndroidOptions androidOptions = const AndroidOptions(
-  //       encryptedSharedPreferences: true,
-  //       keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
-  //       storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
-  //     );
-      
-  //     IOSOptions iosOptions = const IOSOptions(
-  //       accessibility: KeychainAccessibility.first_unlock_this_device,
-  //     );
-      
-  //     final storage = FlutterSecureStorage(
-  //       aOptions: androidOptions,
-  //       iOptions: iosOptions,
-  //     );
-      
-  //     // Manually delete each key
-  //     final keysToDelete = [
-  //       _keyDatabasePassword,
-  //       _keyMasterPassword, 
-  //       _keyEncryptionKey,
-  //       _keyIV,
-  //       _keyBiometricsEnabled,
-  //     ];
-      
-  //     for (final key in keysToDelete) {
-  //       await storage.delete(key: key);
-  //       print('MANUAL KEY DELETION: Deleted $key');
-  //     }
-      
-  //     // Also try deleteAll for good measure
-  //     await storage.deleteAll();
-  //     print('MANUAL KEY DELETION: Called deleteAll()');
-      
-  //     // Clear SharedPreferences
-  //     final prefs = await SharedPreferences.getInstance();
-  //     await prefs.clear();
-  //     print('MANUAL KEY DELETION: Cleared SharedPreferences');
-      
-  //     print('MANUAL KEY DELETION: Complete');
-  //   } catch (e) {
-  //     print('Error in manual key deletion: $e');
-  //   }
-  // }
-
   Future<bool> hasMasterPassword() async {
     try {
       final hash = await getMasterPasswordHash();
@@ -438,6 +390,27 @@ class SecureStorageService {
       }
     } catch (e) {
       print('Error clearing storage on first launch: $e');
+    }
+  }
+
+  Future<void> storeEncryptionSalt(String salt) async {
+    try {
+      await _write(_keyEncryptionSalt, salt);
+      print('Encryption salt stored successfully');
+    } catch (e) {
+      print('Failed to store encryption salt: $e');
+      throw Exception('Failed to store encryption salt: $e');
+    }
+  }
+
+  Future<String?> getEncryptionSalt() async {
+    try {
+      final salt = await _read(_keyEncryptionSalt);
+      print('Encryption salt retrieved: ${salt != null ? 'found' : 'not found'}');
+      return salt;
+    } catch (e) {
+      print('Failed to get encryption salt: $e');
+      return null;
     }
   }
 }

@@ -49,7 +49,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _deleteRecord(String id) async {
     try {
-      final repository = ref.read(repositoryProvider);
+      final repository = ref.read(safeRepositoryProvider);
       await repository.deleteRecord(id);
       ref.invalidate(allRecordsProvider);
 
@@ -83,7 +83,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _toggleFavorite(String id) async {
     try {
-      final repository = ref.read(repositoryProvider);
+      final repository = ref.read(safeRepositoryProvider);
       await repository.toggleFavorite(id);
       ref.invalidate(allRecordsProvider);
       ref.invalidate(favoriteRecordsProvider);

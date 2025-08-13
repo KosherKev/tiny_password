@@ -170,12 +170,18 @@ class RepositoryStateNotifier extends StateNotifier<RepositoryState> {
 }
 
 // Repository Access Provider
-final repositoryProvider = Provider<SQLiteRecordRepository>((ref) {
+final repositoryProvider = Provider<SQLiteRecordRepository?>((ref) {
   final state = ref.watch(repositoryStateProvider);
-  if (state.status != RepositoryStatus.initialized || state.repository == null) {
-    throw Exception('Repository not initialized. Current status: ${state.status}');
+  return state.status == RepositoryStatus.initialized ? state.repository : null;
+});
+
+// Add this new provider for safe access
+final safeRepositoryProvider = Provider<SQLiteRecordRepository>((ref) {
+  final repository = ref.watch(repositoryProvider);
+  if (repository == null) {
+    throw StateError('Repository not available. Please wait for initialization.');
   }
-  return state.repository!;
+  return repository;
 });
 
 // Authentication State Providers
@@ -221,7 +227,7 @@ final autoLockDurationProvider = StateProvider<Duration>((ref) {
 // Record State Providers
 final allRecordsProvider = FutureProvider<List<Record>>((ref) async {
   try {
-    final repository = ref.watch(repositoryProvider);
+    final repository = ref.watch(safeRepositoryProvider);
     return await repository.getAllRecords();
   } catch (e) {
     print('Error getting all records: $e');
@@ -236,7 +242,7 @@ final searchResultsProvider = FutureProvider<List<Record>>((ref) async {
     final query = ref.watch(searchQueryProvider);
     if (query.isEmpty) return <Record>[];
 
-    final repository = ref.watch(repositoryProvider);
+    final repository = ref.watch(safeRepositoryProvider);
     return await repository.searchRecords(query);
   } catch (e) {
     print('Error searching records: $e');
@@ -246,7 +252,7 @@ final searchResultsProvider = FutureProvider<List<Record>>((ref) async {
 
 final favoriteRecordsProvider = FutureProvider<List<Record>>((ref) async {
   try {
-    final repository = ref.watch(repositoryProvider);
+    final repository = ref.watch(safeRepositoryProvider);
     return await repository.getFavoriteRecords();
   } catch (e) {
     print('Error getting favorite records: $e');
@@ -256,7 +262,7 @@ final favoriteRecordsProvider = FutureProvider<List<Record>>((ref) async {
 
 final categoriesProvider = FutureProvider<List<String>>((ref) async {
   try {
-    final repository = ref.watch(repositoryProvider);
+    final repository = ref.watch(safeRepositoryProvider);
     return await repository.getAllCategories();
   } catch (e) {
     print('Error getting categories: $e');
@@ -267,7 +273,7 @@ final categoriesProvider = FutureProvider<List<String>>((ref) async {
 final recordsByCategoryProvider = FutureProvider.family<List<Record>, String>(
   (ref, category) async {
     try {
-      final repository = ref.watch(repositoryProvider);
+      final repository = ref.watch(safeRepositoryProvider);
       return await repository.getRecordsByCategory(category);
     } catch (e) {
       print('Error getting records by category: $e');
@@ -279,7 +285,7 @@ final recordsByCategoryProvider = FutureProvider.family<List<Record>, String>(
 // Selected Record Provider
 final selectedRecordProvider = FutureProvider.family<Record?, String>((ref, recordId) async {
   try {
-    final repository = ref.watch(repositoryProvider);
+    final repository = ref.watch(safeRepositoryProvider);
     return await repository.getRecordById(recordId);
   } catch (e) {
     print('Error getting record by ID: $e');
@@ -293,7 +299,7 @@ final isDarkModeProvider = StateProvider<bool>((ref) => false);
 // Statistics Providers
 final recordCountProvider = FutureProvider<int>((ref) async {
   try {
-    final repository = ref.watch(repositoryProvider);
+    final repository = ref.watch(safeRepositoryProvider);
     return await repository.getRecordCount();
   } catch (e) {
     print('Error getting record count: $e');
@@ -303,7 +309,7 @@ final recordCountProvider = FutureProvider<int>((ref) async {
 
 final categoryCountProvider = FutureProvider<int>((ref) async {
   try {
-    final repository = ref.watch(repositoryProvider);
+    final repository = ref.watch(safeRepositoryProvider);
     return await repository.getCategoryCount();
   } catch (e) {
     print('Error getting category count: $e');

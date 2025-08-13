@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart';
 
+import '../services/secure_storage_service.dart';
+
 class EncryptionService {
   static final EncryptionService _instance = EncryptionService._internal();
   factory EncryptionService() => _instance;
@@ -18,8 +20,17 @@ class EncryptionService {
   /// Initialize the encryption service with a master password for record encryption
   Future<void> initializeWithMasterPassword(String masterPassword) async {
     try {
-      // Generate a consistent salt from master password
-      final salt = _generateDeterministicSalt(masterPassword);
+      // Get or generate random salt
+      String? saltBase64 = await _getStoredSalt();
+      Uint8List salt;
+      
+      if (saltBase64 == null) {
+        salt = _generateRandomSalt();
+        await _storeSalt(base64.encode(salt));
+      } else {
+        salt = base64.decode(saltBase64);
+      }
+      
       final key = await _deriveKey(masterPassword, salt);
       
       _iv = IV.fromSecureRandom(16);
@@ -34,6 +45,9 @@ class EncryptionService {
     }
   }
 
+  /// Check if the service is properly initialized
+  bool get isInitialized => _isInitialized;
+
   /// Reset the encryption service (useful for changing master password)
   void reset() {
     _iv = null;
@@ -43,14 +57,16 @@ class EncryptionService {
     print('Encryption service reset');
   }
 
-  /// Check if the service is properly initialized
-  bool get isInitialized => _isInitialized;
+  // Add these new methods
+  Future<String?> _getStoredSalt() async {
+    // You'll need to add salt storage to SecureStorageService
+    final secureStorage = SecureStorageService();
+    return await secureStorage.getEncryptionSalt();
+  }
 
-  /// Generate a deterministic salt from master password for consistency
-  Uint8List _generateDeterministicSalt(String masterPassword) {
-    final bytes = utf8.encode('tiny_password_salt_v1_$masterPassword');
-    final digest = sha256.convert(bytes);
-    return Uint8List.fromList(digest.bytes.take(32).toList());
+  Future<void> _storeSalt(String saltBase64) async {
+    final secureStorage = SecureStorageService();
+    await secureStorage.storeEncryptionSalt(saltBase64);
   }
 
   /// Generate a truly random salt for database passwords
@@ -69,7 +85,7 @@ class EncryptionService {
     final bytes = await _pbkdf2(
       hmac: hmac,
       salt: salt,
-      iterations: 100000,
+      iterations: 600000,
       length: 32,
     );
     return bytes;

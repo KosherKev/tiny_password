@@ -106,7 +106,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   Future<void> _exportData() async {
     try {
-      final repository = ref.read(repositoryProvider);
+      final repository = ref.read(safeRepositoryProvider);
       final exportedData = await repository.exportToBackup('backup_password');
 
       if (!mounted) return;

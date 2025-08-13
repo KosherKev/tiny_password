@@ -22,23 +22,23 @@ final isBiometricEnabledProvider = FutureProvider<bool>((ref) async {
 // Record Repository Provider
 // Records State
 final allRecordsProvider = FutureProvider<List<Record>>((ref) async {
-  final repository = ref.watch(repositoryProvider);
+  final repository = ref.watch(safeRepositoryProvider);
   return await repository.getAllRecords();
 });
 
 final favoriteRecordsProvider = FutureProvider<List<Record>>((ref) async {
-  final repository = ref.watch(repositoryProvider);
+  final repository = ref.watch(safeRepositoryProvider);
   return await repository.getFavoriteRecords();
 });
 
 final categoriesProvider = FutureProvider<List<String>>((ref) async {
-  final repository = ref.watch(repositoryProvider);
+  final repository = ref.watch(safeRepositoryProvider);
   return await repository.getAllCategories();
 });
 
 final recordsByCategoryProvider = FutureProvider.family<List<Record>, String>(
   (ref, category) async {
-    final repository = ref.watch(repositoryProvider);
+    final repository = ref.watch(safeRepositoryProvider);
     return await repository.getRecordsByCategory(category);
   },
 );
@@ -49,7 +49,7 @@ final searchResultsProvider = FutureProvider<List<Record>>((ref) async {
   final query = ref.watch(searchQueryProvider);
   if (query.isEmpty) return [];
 
-  final repository = ref.watch(repositoryProvider);
+  final repository = ref.watch(safeRepositoryProvider);
   return await repository.searchRecords(query);
 });
 
@@ -83,12 +83,12 @@ final successMessageProvider = StateProvider<String?>((ref) => null);
 
 // Record Count
 final recordCountProvider = FutureProvider<int>((ref) async {
-  final repository = ref.watch(repositoryProvider);
+  final repository = ref.watch(safeRepositoryProvider);
   return await repository.getRecordCount();
 });
 
 // Category Count
 final categoryCountProvider = FutureProvider<int>((ref) async {
-  final repository = ref.watch(repositoryProvider);
+  final repository = ref.watch(safeRepositoryProvider);
   return await repository.getCategoryCount();
 });
