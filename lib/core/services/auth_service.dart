@@ -72,6 +72,10 @@ class AuthService {
           _encryptionService.reset();
           await _encryptionService.initializeWithMasterPassword(password);
           print('Encryption service initialized after verification');
+          
+          // Validate IV and regenerate if needed (handles hot restart scenarios)
+          await _encryptionService.validateOrRegenerateIV();
+          print('IV validation completed');
         } catch (e) {
           print('Failed to initialize encryption after verification: $e');
           throw Exception('Failed to initialize encryption: $e');
@@ -85,7 +89,7 @@ class AuthService {
     }
   }
 
-  Future<bool> changeMasterPassword(String oldPassword, String newPassword) async {
+  Future<bool> changeMasterPassword(String oldPassword, String newPassword, {dynamic recordRepository}) async {
     print('Changing master password...');
     
     if (!await verifyMasterPassword(oldPassword)) {
@@ -97,9 +101,56 @@ class AuthService {
     }
 
     try {
-      // Set the new master password
+      // Get existing records BEFORE changing the password (while old encryption is still active)
+      List<dynamic>? existingRecords;
+      if (recordRepository != null) {
+        print('Getting existing records for re-encryption...');
+        try {
+           existingRecords = await recordRepository.getAllRecordsForPasswordChange();
+           print('Found ${existingRecords?.length ?? 0} records to re-encrypt');
+        } catch (e) {
+          print('Warning: Could not get existing records: $e');
+          // Continue anyway - this might be the first time setting up
+        }
+      }
+
+      // Clear the stored IV so a new one will be generated
+      await _secureStorage.deleteIV();
+      print('Cleared old IV for new password');
+      
+      // Set the new master password (this will generate a new IV)
       await setMasterPassword(newPassword);
       print('Master password changed successfully');
+      
+      // Re-encrypt existing records with the new password and IV
+      if (recordRepository != null && existingRecords != null && existingRecords.isNotEmpty) {
+        print('Re-encrypting ${existingRecords.length} records with new password...');
+        
+        // Note: No need to call initializeRecordEncryption again as setMasterPassword already initialized it
+        
+        // Update each record to re-encrypt it
+        for (final record in existingRecords) {
+          try {
+            await recordRepository.updateRecord(record);
+          } catch (e) {
+            print('Warning: Failed to re-encrypt record ${record.id}: $e');
+            // Continue with other records
+          }
+        }
+        print('Record re-encryption completed');
+      }
+      
+      // Update biometric master password if biometrics is enabled
+      if (await isBiometricsEnabled()) {
+        try {
+          await storeMasterPasswordForBiometrics(newPassword);
+          print('Updated biometric master password storage');
+        } catch (e) {
+          print('Warning: Failed to update biometric master password: $e');
+          // Don't fail the entire operation for this
+        }
+      }
+      
       return true;
     } catch (e) {
       print('Error changing master password: $e');
@@ -214,6 +265,11 @@ class AuthService {
       // Initialize encryption with the stored master password
       await _encryptionService.initializeWithMasterPassword(masterPassword);
       print('Biometric unlock successful - encryption initialized');
+      
+      // Validate IV and regenerate if needed (handles hot restart scenarios)
+      await _encryptionService.validateOrRegenerateIV();
+      print('IV validation completed for biometric unlock');
+      
       return true;
     } catch (e) {
       print('Failed to initialize encryption after biometric unlock: $e');

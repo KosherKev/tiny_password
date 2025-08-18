@@ -81,7 +81,7 @@ class _SetupMasterPasswordScreenState
       final repositoryNotifier = ref.read(repositoryStateProvider.notifier);
       
       await authService.setMasterPassword(_passwordController.text);
-      await repositoryNotifier.initializeRecordEncryption(_passwordController.text);
+      // Note: No need to call initializeRecordEncryption as setMasterPassword already initializes encryption
 
       final isBiometricsAvailable = await authService.isBiometricsAvailable();
 

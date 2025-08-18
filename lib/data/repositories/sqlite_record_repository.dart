@@ -336,12 +336,73 @@ class SQLiteRecordRepository implements RecordRepository {
     }
   }
 
+  /// Get all records for password change - returns decrypted records for re-encryption
+  Future<List<Record>> getAllRecordsForPasswordChange() async {
+    try {
+      final db = await database;
+      final records = await db.query('records', orderBy: 'modified_at DESC');
+      
+      final List<Record> decryptedRecords = [];
+      final List<String> corruptedRecordIds = [];
+      
+      for (final record in records) {
+        try {
+          final decryptedRecord = _decryptRecord(record);
+          decryptedRecords.add(decryptedRecord);
+        } catch (e) {
+          print('Failed to decrypt record ${record['id']} during password change: $e');
+          corruptedRecordIds.add(record['id'] as String);
+        }
+      }
+      
+      // Remove corrupted records
+      if (corruptedRecordIds.isNotEmpty) {
+        print('Removing ${corruptedRecordIds.length} corrupted records during password change');
+        for (final id in corruptedRecordIds) {
+          await deleteRecord(id);
+        }
+      }
+      
+      return decryptedRecords;
+    } catch (e) {
+      print('Error getting records for password change: $e');
+      throw Exception('Failed to get records for password change: $e');
+    }
+  }
+
   @override
   Future<List<Record>> getAllRecords() async {
     try {
       final db = await database;
       final records = await db.query('records', orderBy: 'modified_at DESC');
-      return records.map((record) => _decryptRecord(record)).toList();
+      
+      final List<Record> decryptedRecords = [];
+      final List<String> corruptedRecordIds = [];
+      
+      for (final record in records) {
+        try {
+          final decryptedRecord = _decryptRecord(record);
+          decryptedRecords.add(decryptedRecord);
+        } catch (e) {
+          print('Failed to decrypt record ${record['id']}: $e');
+          corruptedRecordIds.add(record['id'] as String);
+        }
+      }
+      
+      // Remove corrupted records that can't be decrypted
+      if (corruptedRecordIds.isNotEmpty) {
+        print('Removing ${corruptedRecordIds.length} corrupted records that cannot be decrypted');
+        for (final id in corruptedRecordIds) {
+          try {
+            await db.delete('records', where: 'id = ?', whereArgs: [id]);
+            print('Removed corrupted record: $id');
+          } catch (e) {
+            print('Failed to remove corrupted record $id: $e');
+          }
+        }
+      }
+      
+      return decryptedRecords;
     } catch (e) {
       print('Error getting all records: $e');
       throw Exception('Failed to get records: $e');
@@ -354,7 +415,16 @@ class SQLiteRecordRepository implements RecordRepository {
       final db = await database;
       final records = await db.query('records', where: 'id = ?', whereArgs: [id]);
       if (records.isEmpty) return null;
-      return _decryptRecord(records.first);
+      
+      try {
+        return _decryptRecord(records.first);
+      } catch (e) {
+        print('Failed to decrypt record $id: $e');
+        // Remove corrupted record
+        await db.delete('records', where: 'id = ?', whereArgs: [id]);
+        print('Removed corrupted record: $id');
+        return null;
+      }
     } catch (e) {
       print('Error getting record by ID: $e');
       throw Exception('Failed to get record: $e');
@@ -371,7 +441,33 @@ class SQLiteRecordRepository implements RecordRepository {
         whereArgs: [category],
         orderBy: 'modified_at DESC',
       );
-      return records.map((record) => _decryptRecord(record)).toList();
+      
+      final List<Record> decryptedRecords = [];
+      final List<String> corruptedRecordIds = [];
+      
+      for (final record in records) {
+        try {
+          final decryptedRecord = _decryptRecord(record);
+          decryptedRecords.add(decryptedRecord);
+        } catch (e) {
+          print('Failed to decrypt record ${record['id']}: $e');
+          corruptedRecordIds.add(record['id'] as String);
+        }
+      }
+      
+      // Remove corrupted records
+      if (corruptedRecordIds.isNotEmpty) {
+        for (final id in corruptedRecordIds) {
+          try {
+            await db.delete('records', where: 'id = ?', whereArgs: [id]);
+            print('Removed corrupted record: $id');
+          } catch (e) {
+            print('Failed to remove corrupted record $id: $e');
+          }
+        }
+      }
+      
+      return decryptedRecords;
     } catch (e) {
       print('Error getting records by category: $e');
       throw Exception('Failed to get records by category: $e');
@@ -388,7 +484,33 @@ class SQLiteRecordRepository implements RecordRepository {
         whereArgs: [1],
         orderBy: 'modified_at DESC',
       );
-      return records.map((record) => _decryptRecord(record)).toList();
+      
+      final List<Record> decryptedRecords = [];
+      final List<String> corruptedRecordIds = [];
+      
+      for (final record in records) {
+        try {
+          final decryptedRecord = _decryptRecord(record);
+          decryptedRecords.add(decryptedRecord);
+        } catch (e) {
+          print('Failed to decrypt record ${record['id']}: $e');
+          corruptedRecordIds.add(record['id'] as String);
+        }
+      }
+      
+      // Remove corrupted records
+      if (corruptedRecordIds.isNotEmpty) {
+        for (final id in corruptedRecordIds) {
+          try {
+            await db.delete('records', where: 'id = ?', whereArgs: [id]);
+            print('Removed corrupted record: $id');
+          } catch (e) {
+            print('Failed to remove corrupted record $id: $e');
+          }
+        }
+      }
+      
+      return decryptedRecords;
     } catch (e) {
       print('Error getting favorite records: $e');
       throw Exception('Failed to get favorite records: $e');
@@ -405,7 +527,33 @@ class SQLiteRecordRepository implements RecordRepository {
         whereArgs: ['%$query%', '%$query%'],
         orderBy: 'modified_at DESC',
       );
-      return records.map((record) => _decryptRecord(record)).toList();
+      
+      final List<Record> decryptedRecords = [];
+      final List<String> corruptedRecordIds = [];
+      
+      for (final record in records) {
+        try {
+          final decryptedRecord = _decryptRecord(record);
+          decryptedRecords.add(decryptedRecord);
+        } catch (e) {
+          print('Failed to decrypt record ${record['id']}: $e');
+          corruptedRecordIds.add(record['id'] as String);
+        }
+      }
+      
+      // Remove corrupted records
+      if (corruptedRecordIds.isNotEmpty) {
+        for (final id in corruptedRecordIds) {
+          try {
+            await db.delete('records', where: 'id = ?', whereArgs: [id]);
+            print('Removed corrupted record: $id');
+          } catch (e) {
+            print('Failed to remove corrupted record $id: $e');
+          }
+        }
+      }
+      
+      return decryptedRecords;
     } catch (e) {
       print('Error searching records: $e');
       throw Exception('Failed to search records: $e');
@@ -648,7 +796,33 @@ class SQLiteRecordRepository implements RecordRepository {
         whereArgs: [date.toIso8601String()],
         orderBy: 'modified_at DESC',
       );
-      return records.map((record) => _decryptRecord(record)).toList();
+      
+      final List<Record> decryptedRecords = [];
+      final List<String> corruptedRecordIds = [];
+      
+      for (final record in records) {
+        try {
+          final decryptedRecord = _decryptRecord(record);
+          decryptedRecords.add(decryptedRecord);
+        } catch (e) {
+          print('Failed to decrypt record ${record['id']}: $e');
+          corruptedRecordIds.add(record['id'] as String);
+        }
+      }
+      
+      // Remove corrupted records
+      if (corruptedRecordIds.isNotEmpty) {
+        for (final id in corruptedRecordIds) {
+          try {
+            await db.delete('records', where: 'id = ?', whereArgs: [id]);
+            print('Removed corrupted record: $id');
+          } catch (e) {
+            print('Failed to remove corrupted record $id: $e');
+          }
+        }
+      }
+      
+      return decryptedRecords;
     } catch (e) {
       print('Error getting records modified since date: $e');
       throw Exception('Failed to get modified records: $e');

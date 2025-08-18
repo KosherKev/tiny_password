@@ -84,10 +84,14 @@ class _ChangeMasterPasswordScreenState
         return;
       }
 
+      // Get record repository for re-encryption
+      final recordRepository = ref.read(repositoryProvider);
+      
       // Change master password
       await authService.changeMasterPassword(
         _currentPasswordController.text,
         _newPasswordController.text,
+        recordRepository: recordRepository,
       );
 
       if (!mounted) return;

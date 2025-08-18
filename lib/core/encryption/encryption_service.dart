@@ -33,7 +33,15 @@ class EncryptionService {
       
       final key = await _deriveKey(masterPassword, salt);
       
-      _iv = IV.fromSecureRandom(16);
+      // Get or generate IV persistently
+      String? ivBase64 = await _getStoredIV();
+      if (ivBase64 == null) {
+        _iv = IV.fromSecureRandom(16);
+        await _storeIV(base64.encode(_iv!.bytes));
+      } else {
+        _iv = IV.fromBase64(ivBase64);
+      }
+      
       _encrypter = Encrypter(AES(Key.fromBase64(base64.encode(key))));
       _currentMasterPassword = masterPassword;
       _isInitialized = true;
@@ -42,6 +50,38 @@ class EncryptionService {
     } catch (e) {
       print('Failed to initialize encryption service: $e');
       throw Exception('Failed to initialize encryption service: $e');
+    }
+  }
+  
+  /// Test if current encryption setup can decrypt a sample and regenerate IV if needed
+  Future<void> validateOrRegenerateIV() async {
+    if (!_isInitialized) {
+      throw Exception('Encryption service not initialized');
+    }
+    
+    try {
+      // Create a test encryption to validate the current IV
+      final testData = 'test_validation_${DateTime.now().millisecondsSinceEpoch}';
+      final encrypted = encrypt(testData);
+      final decrypted = decrypt(encrypted);
+      
+      if (decrypted == testData) {
+        print('IV validation successful');
+        return;
+      }
+    } catch (e) {
+      print('IV validation failed, regenerating: $e');
+    }
+    
+    // If we reach here, the IV is invalid - regenerate it
+    try {
+      print('Regenerating IV due to validation failure');
+      _iv = IV.fromSecureRandom(16);
+      await _storeIV(base64.encode(_iv!.bytes));
+      print('IV regenerated successfully');
+    } catch (e) {
+      print('Failed to regenerate IV: $e');
+      throw Exception('Failed to regenerate IV: $e');
     }
   }
 
@@ -67,6 +107,16 @@ class EncryptionService {
   Future<void> _storeSalt(String saltBase64) async {
     final secureStorage = SecureStorageService();
     await secureStorage.storeEncryptionSalt(saltBase64);
+  }
+
+  Future<String?> _getStoredIV() async {
+    final secureStorage = SecureStorageService();
+    return await secureStorage.getIV();
+  }
+
+  Future<void> _storeIV(String ivBase64) async {
+    final secureStorage = SecureStorageService();
+    await secureStorage.storeIV(ivBase64);
   }
 
   /// Generate a truly random salt for database passwords

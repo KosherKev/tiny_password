@@ -87,10 +87,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
       final success = await authService.unlockWithBiometrics();
 
       if (success && mounted) {
-        // Initialize repository encryption
-        await repositoryNotifier.initializeRecordEncryption(
-          await authService.getMasterPasswordForBiometrics() ?? ''
-        );
+        // Note: No need to call initializeRecordEncryption as unlockWithBiometrics already initializes encryption
         
         ref.read(isAuthenticatedProvider.notifier).state = true;
         
@@ -141,7 +138,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
         return;
       }
 
-      await repositoryNotifier.initializeRecordEncryption(_passwordController.text);
+      // Note: No need to call initializeRecordEncryption as verifyMasterPassword already initializes encryption
       ref.read(isAuthenticatedProvider.notifier).state = true;
 
       if (mounted) {

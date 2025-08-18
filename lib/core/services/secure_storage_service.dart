@@ -274,6 +274,31 @@ class SecureStorageService {
     }
   }
 
+  Future<void> deleteIV() async {
+    try {
+      await _initStorage();
+      
+      if (_useSecureStorage && _storage != null) {
+        try {
+          await _storage!.delete(key: _keyIV);
+        } catch (e) {
+          print('Secure storage delete failed, falling back: $e');
+          _useSecureStorage = false;
+          _prefs ??= await SharedPreferences.getInstance();
+        }
+      }
+      
+      if (_prefs != null) {
+        await _prefs!.remove(_keyIV);
+      }
+      
+      print('IV deleted successfully');
+    } catch (e) {
+      print('Failed to delete IV: $e');
+      throw Exception('Failed to delete IV: $e');
+    }
+  }
+
   Future<void> setBiometricsEnabled(bool enabled) async {
     try {
       await _writeBool(_keyBiometricsEnabled, enabled);
