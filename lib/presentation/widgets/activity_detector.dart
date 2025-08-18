@@ -30,7 +30,6 @@ class ActivityDetector extends ConsumerWidget {
         },
         child: GestureDetector(
           onTap: () => _recordActivity(autoLockService),
-          onPanUpdate: (_) => _recordActivity(autoLockService),
           onScaleUpdate: (_) => _recordActivity(autoLockService),
           behavior: HitTestBehavior.translucent,
           child: child,

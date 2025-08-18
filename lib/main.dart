@@ -45,6 +45,13 @@ class TinyPasswordApp extends ConsumerWidget {
           // Dismiss keyboard when tapping outside of text fields
           FocusManager.instance.primaryFocus?.unfocus();
         },
+        onPanUpdate: (details) {
+          // Dismiss keyboard on downward swipe
+          if (details.delta.dy > 5.0) {
+            FocusManager.instance.primaryFocus?.unfocus();
+          }
+        },
+        behavior: HitTestBehavior.translucent,
         child: MaterialApp(
           title: 'Guardian',
           debugShowCheckedModeBanner: false,
