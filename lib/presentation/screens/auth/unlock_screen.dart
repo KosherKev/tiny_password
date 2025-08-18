@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tiny_password/core/providers/providers.dart';
+import 'package:tiny_password/core/services/auto_lock_service.dart';
 import 'package:tiny_password/presentation/screens/auth/setup_master_password_screen.dart';
 import 'package:tiny_password/presentation/widgets/custom_button.dart';
 import 'package:tiny_password/presentation/widgets/custom_text_field.dart';
@@ -120,6 +121,9 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
       }
 
       ref.read(isAuthenticatedProvider.notifier).state = true;
+      
+      // Start auto-lock timer after successful authentication
+      ref.read(autoLockServiceProvider).onAuthenticated();
 
       if (mounted) {
         ref.read(navigationServiceProvider).navigateToHome();

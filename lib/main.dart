@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tiny_password/core/providers/providers.dart';
 import 'core/services/navigation_service.dart';
 import 'core/services/password_generator_service.dart';
+import 'core/services/auto_lock_service.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/screens/auth/setup_master_password_screen.dart';
 import 'presentation/screens/auth/unlock_screen.dart';
 import 'presentation/screens/common/loading_screen.dart';
 import 'presentation/screens/home/home_screen.dart';
+import 'presentation/widgets/activity_detector.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,19 +39,21 @@ class TinyPasswordApp extends ConsumerWidget {
       }
     });
 
-    return GestureDetector(
-      onTap: () {
-        // Dismiss keyboard when tapping outside of text fields
-        FocusManager.instance.primaryFocus?.unfocus();
-      },
-      child: MaterialApp(
-        title: 'Guardian',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
-        navigatorKey: NavigationService.navigatorKey,
-        home: const AppHome(),
+    return ActivityDetector(
+      child: GestureDetector(
+        onTap: () {
+          // Dismiss keyboard when tapping outside of text fields
+          FocusManager.instance.primaryFocus?.unfocus();
+        },
+        child: MaterialApp(
+          title: 'Guardian',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          navigatorKey: NavigationService.navigatorKey,
+          home: const AppHome(),
+        ),
       ),
     );
   }
@@ -95,6 +99,9 @@ class AuthenticationHandler extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Initialize auto-lock service
+    ref.watch(autoLockServiceProvider);
+    
     return ref.watch(hasMasterPasswordProvider).when(
       data: (hasPassword) {
         print('Master password check result: $hasPassword');
