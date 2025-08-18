@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/providers.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/record.dart';
 import '../../widgets/custom_text_field.dart';
-import 'dart:math' as math;
 
 class RecordDetailsScreen extends ConsumerStatefulWidget {
   final String recordId;
@@ -26,9 +27,8 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
   late final TextEditingController _notesController;
   late final Map<String, TextEditingController> _fieldControllers;
   bool _isEditing = false;
-  bool _showPasswords = false;
+  bool _showSensitiveFields = false;
   late AnimationController _animationController;
-  late AnimationController _particleController;
   late Animation<double> _slideAnimation;
   late Animation<double> _fadeAnimation;
 
@@ -41,17 +41,12 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
     _fieldControllers = {};
     
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    
-    _particleController = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..repeat();
 
     _slideAnimation = Tween<double>(
-      begin: 30.0,
+      begin: 20.0,
       end: 0.0,
     ).animate(CurvedAnimation(
       parent: _animationController,
@@ -72,7 +67,6 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
   @override
   void dispose() {
     _animationController.dispose();
-    _particleController.dispose();
     _titleController.dispose();
     _notesController.dispose();
     for (final controller in _fieldControllers.values) {
@@ -120,7 +114,7 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Record saved successfully'),
-          backgroundColor: const Color(0xFF22c55e),
+          backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -131,11 +125,10 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
       setState(() => _isEditing = false);
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
-          backgroundColor: const Color(0xFFef4444),
+          backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -154,12 +147,16 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 20),
+            Icon(
+              Icons.check_circle,
+              color: Theme.of(context).colorScheme.onPrimary,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             const Text('Copied to clipboard'),
           ],
         ),
-        backgroundColor: const Color(0xFF22c55e),
+        backgroundColor: Theme.of(context).colorScheme.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -169,445 +166,275 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
     );
   }
 
-  Color _getRecordTypeColor(RecordType type) {
-    switch (type) {
-      case RecordType.login:
-        return const Color(0xFF3b82f6);
-      case RecordType.creditCard:
-        return const Color(0xFFef4444);
-      case RecordType.bankAccount:
-        return const Color(0xFF22c55e);
-      case RecordType.note:
-        return const Color(0xFF8b5cf6);
-    }
-  }
-
-  IconData _getRecordTypeIcon(RecordType type) {
-    switch (type) {
-      case RecordType.login:
-        return Icons.key;
-      case RecordType.creditCard:
-        return Icons.credit_card;
-      case RecordType.bankAccount:
-        return Icons.account_balance;
-      case RecordType.note:
-        return Icons.note;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final recordAsync = ref.watch(selectedRecordProvider(widget.recordId));
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0f0f0f),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1a1a1a),
-              Color(0xFF0f0f0f),
-              Color(0xFF2d2d2d),
-            ],
+      backgroundColor: Theme.of(context).colorScheme.background,
+      appBar: AppBar(
+        title: const Text('Record Details'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        actions: [
+          if (_isEditing)
+            IconButton(
+              icon: Icon(
+                Icons.save,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              onPressed: _saveRecord,
+            )
+          else
+            IconButton(
+              icon: Icon(
+                Icons.edit,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              onPressed: () => setState(() => _isEditing = true),
+            ),
+          IconButton(
+            icon: const Icon(Icons.more_vert),
+            onPressed: _showOptionsMenu,
           ),
-        ),
-        child: Stack(
-          children: [
-            // Marble texture overlay
-            Container(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: const AssetImage('assets/images/marble_texture.png'),
-                  fit: BoxFit.cover,
-                  opacity: 0.05,
-                  colorFilter: ColorFilter.mode(
-                    Colors.white.withOpacity(0.02),
-                    BlendMode.overlay,
+        ],
+      ),
+      body: recordAsync.when(
+        data: (record) {
+          if (_fieldControllers.isEmpty && record != null) {
+            _initializeControllers(record);
+          }
+
+          if (record == null) {
+            return const Center(
+              child: Text(
+                'Record not found',
+                style: TextStyle(fontSize: 18),
+              ),
+            );
+          }
+
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+          final typeColor = AppTheme.getRecordTypeColor(record.type.name, isDarkMode);
+
+          return AnimatedBuilder(
+            animation: _animationController,
+            builder: (context, child) {
+              return Opacity(
+                opacity: _fadeAnimation.value,
+                child: Transform.translate(
+                  offset: Offset(0, _slideAnimation.value),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Record Type Header
+                        _buildTypeHeader(context, record, typeColor),
+                        const SizedBox(height: 24),
+
+                        // Title Field
+                        _buildFieldCard(
+                          context,
+                          'Title',
+                          _isEditing
+                              ? CustomTextField(
+                                  controller: _titleController,
+                                  labelText: 'Title',
+                                )
+                              : _buildDisplayField(
+                                  context,
+                                  _titleController.text,
+                                  showCopy: false,
+                                ),
+                        ),
+
+                        // Dynamic fields based on record type
+                        ...record.fields.entries.map((entry) {
+                          final controller = _fieldControllers[entry.key];
+                          if (controller == null) return const SizedBox.shrink();
+
+                          final fieldLabel = _getFieldLabel(record.type, entry.key);
+                          final isSensitive = record.sensitiveFieldKeys.contains(entry.key);
+
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: _buildFieldCard(
+                              context,
+                              fieldLabel,
+                              _isEditing
+                                  ? CustomTextField(
+                                      controller: controller,
+                                      labelText: fieldLabel,
+                                      obscureText: isSensitive && !_showSensitiveFields,
+                                    )
+                                  : _buildDisplayField(
+                                      context,
+                                      controller.text,
+                                      isSensitive: isSensitive,
+                                    ),
+                            ),
+                          );
+                        }),
+
+                        const SizedBox(height: 16),
+
+                        // Notes Field
+                        _buildFieldCard(
+                          context,
+                          'Notes',
+                          _isEditing
+                              ? CustomTextField(
+                                  controller: _notesController,
+                                  labelText: 'Notes',
+                                  maxLines: 4,
+                                )
+                              : _buildDisplayField(
+                                  context,
+                                  _notesController.text.isEmpty
+                                      ? 'No notes'
+                                      : _notesController.text,
+                                  showCopy: _notesController.text.isNotEmpty,
+                                ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Sensitive Fields Toggle
+                        if (!_isEditing && record.hasSensitiveFields)
+                          _buildSensitiveToggle(context, typeColor),
+
+                        const SizedBox(height: 24),
+
+                        // Metadata Card
+                        _buildMetadataCard(context, record, typeColor),
+
+                        const SizedBox(height: 100),
+                      ],
+                    ),
                   ),
                 ),
+              );
+            },
+          );
+        },
+        loading: () => const Center(
+          child: CircularProgressIndicator(),
+        ),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
               ),
-            ),
-
-            // Floating particles
-            AnimatedBuilder(
-              animation: _particleController,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: DetailParticlePainter(_particleController.value),
-                  size: Size.infinite,
-                );
-              },
-            ),
-
-            // Main content
-            recordAsync.when(
-              data: (record) {
-                if (_fieldControllers.isEmpty && record != null) {
-                  _initializeControllers(record);
-                }
-
-                if (record == null) {
-                  return const Center(
-                    child: Text(
-                      'Record not found',
-                      style: TextStyle(color: Colors.white, fontSize: 18),
-                    ),
-                  );
-                }
-
-                return AnimatedBuilder(
-                  animation: _animationController,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: _fadeAnimation.value,
-                      child: Transform.translate(
-                        offset: Offset(0, _slideAnimation.value),
-                        child: CustomScrollView(
-                          slivers: [
-                            // Modern App Bar
-                            SliverAppBar(
-                              expandedHeight: 120,
-                              floating: false,
-                              pinned: true,
-                              backgroundColor: Colors.transparent,
-                              leading: IconButton(
-                                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                                onPressed: () => Navigator.of(context).pop(),
-                              ),
-                              actions: [
-                                if (_isEditing)
-                                  IconButton(
-                                    icon: const Icon(Icons.save, color: Color(0xFF22c55e)),
-                                    onPressed: _saveRecord,
-                                  )
-                                else
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, color: Color(0xFFfbbf24)),
-                                    onPressed: () => setState(() => _isEditing = true),
-                                  ),
-                                const SizedBox(width: 8),
-                              ],
-                              flexibleSpace: FlexibleSpaceBar(
-                                titlePadding: const EdgeInsets.only(left: 60, bottom: 16),
-                                title: Row(
-                                  children: [
-                                    Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(8),
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            _getRecordTypeColor(record.type),
-                                            _getRecordTypeColor(record.type).withOpacity(0.8),
-                                          ],
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        _getRecordTypeIcon(record.type),
-                                        color: Colors.white,
-                                        size: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        record.title,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            // Content
-                            SliverPadding(
-                              padding: const EdgeInsets.all(24),
-                              sliver: SliverList(
-                                delegate: SliverChildListDelegate([
-                                  // Record type indicator
-                                  Container(
-                                    padding: const EdgeInsets.all(20),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(16),
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          _getRecordTypeColor(record.type).withOpacity(0.1),
-                                          _getRecordTypeColor(record.type).withOpacity(0.05),
-                                        ],
-                                      ),
-                                      border: Border.all(
-                                        color: _getRecordTypeColor(record.type).withOpacity(0.3),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          _getRecordTypeIcon(record.type),
-                                          color: _getRecordTypeColor(record.type),
-                                          size: 24,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          record.type.toString().split('.').last.toUpperCase(),
-                                          style: TextStyle(
-                                            color: _getRecordTypeColor(record.type),
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        if (record.isFavorite)
-                                          const Icon(
-                                            Icons.star,
-                                            color: Color(0xFFfbbf24),
-                                            size: 20,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 24),
-
-                                  // Title field
-                                  _buildFieldCard(
-                                    label: 'Title',
-                                    child: _isEditing
-                                        ? CustomTextField(
-                                            controller: _titleController,
-                                            labelText: 'Title',
-                                          )
-                                        : _buildDisplayField(
-                                            _titleController.text,
-                                            showCopy: false,
-                                          ),
-                                  ),
-
-                                  // Dynamic fields based on record type
-                                  ...record.fields.entries.map((entry) {
-                                    final controller = _fieldControllers[entry.key]!;
-                                    final isPassword = entry.key.toLowerCase().contains('password');
-
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 16),
-                                      child: _buildFieldCard(
-                                        label: _formatFieldLabel(entry.key),
-                                        child: _isEditing
-                                            ? CustomTextField(
-                                                controller: controller,
-                                                labelText: _formatFieldLabel(entry.key),
-                                                obscureText: isPassword && !_showPasswords,
-                                              )
-                                            : _buildDisplayField(
-                                                controller.text,
-                                                isPassword: isPassword,
-                                              ),
-                                      ),
-                                    );
-                                  }),
-
-                                  const SizedBox(height: 16),
-
-                                  // Notes field
-                                  _buildFieldCard(
-                                    label: 'Notes',
-                                    child: _isEditing
-                                        ? CustomTextField(
-                                            controller: _notesController,
-                                            labelText: 'Notes',
-                                            maxLines: 4,
-                                          )
-                                        : _buildDisplayField(
-                                            _notesController.text.isEmpty
-                                                ? 'No notes'
-                                                : _notesController.text,
-                                            showCopy: _notesController.text.isNotEmpty,
-                                          ),
-                                  ),
-
-                                  const SizedBox(height: 24),
-
-                                  // Password visibility toggle
-                                  if (!_isEditing && record.fields.values.any((v) => v.isNotEmpty))
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(16),
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.white.withOpacity(0.05),
-                                            Colors.white.withOpacity(0.02),
-                                          ],
-                                        ),
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.1),
-                                        ),
-                                      ),
-                                      child: SwitchListTile(
-                                        title: const Text(
-                                          'Show Passwords',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        subtitle: Text(
-                                          'Reveal hidden fields',
-                                          style: TextStyle(
-                                            color: Colors.grey[400],
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                        value: _showPasswords,
-                                        onChanged: (value) {
-                                          setState(() => _showPasswords = value);
-                                        },
-                                        activeColor: const Color(0xFFfbbf24),
-                                        contentPadding: const EdgeInsets.symmetric(
-                                          horizontal: 20,
-                                          vertical: 8,
-                                        ),
-                                      ),
-                                    ),
-
-                                  const SizedBox(height: 24),
-
-                                  // Metadata card
-                                  Container(
-                                    padding: const EdgeInsets.all(20),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(16),
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Colors.white.withOpacity(0.05),
-                                          Colors.white.withOpacity(0.02),
-                                        ],
-                                      ),
-                                      border: Border.all(
-                                        color: Colors.white.withOpacity(0.1),
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.info_outline,
-                                              color: Color(0xFF6b7280),
-                                              size: 20,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              'Record Information',
-                                              style: TextStyle(
-                                                color: Colors.grey[400],
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        _buildMetadataRow('Category', record.category ?? 'No Category'),
-                                        _buildMetadataRow('Created', _formatDate(record.createdAt)),
-                                        _buildMetadataRow('Modified', _formatDate(record.modifiedAt)),
-                                      ],
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 100),
-                                ]),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-              loading: () => const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFFfbbf24),
+              const SizedBox(height: 16),
+              Text(
+                'Error loading record',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
                 ),
               ),
-              error: (error, stack) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.red[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Error loading record',
-                      style: TextStyle(
-                        color: Colors.red[400],
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      error.toString(),
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+              const SizedBox(height: 8),
+              Text(
+                error.toString(),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildFieldCard({required String label, required Widget child}) {
+  Widget _buildTypeHeader(BuildContext context, Record record, Color typeColor) {
+    final typeInfo = AppConstants.recordTypes[record.type.name];
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: typeColor.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: typeColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              _getIconForRecordType(record.type),
+              color: typeColor,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  typeInfo?.name ?? record.type.displayName,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: typeColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  typeInfo?.description ?? record.typeDescription,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (record.isFavorite)
+            Icon(
+              Icons.star,
+              color: Theme.of(context).colorScheme.tertiary,
+              size: 24,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFieldCard(BuildContext context, String label, Widget child) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.08),
-            Colors.white.withOpacity(0.04),
-          ],
-        ),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Theme.of(context).colorScheme.outline,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
               label,
-              style: TextStyle(
-                color: const Color(0xFFfbbf24),
-                fontSize: 14,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: child,
           ),
         ],
@@ -615,49 +442,118 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
     );
   }
 
-  Widget _buildDisplayField(String value, {bool isPassword = false, bool showCopy = true}) {
-    final displayValue = isPassword && !_showPasswords 
+  Widget _buildDisplayField(
+    BuildContext context,
+    String value,
+    {bool isSensitive = false, bool showCopy = true}
+  ) {
+    final displayValue = isSensitive && !_showSensitiveFields 
         ? '•' * (value.length.clamp(6, 12))
         : value;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              displayValue,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                fontFamily: isPassword ? 'monospace' : null,
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            displayValue,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              fontFamily: isSensitive ? 'monospace' : null,
+            ),
+          ),
+        ),
+        if (showCopy && value.isNotEmpty) ...[
+          const SizedBox(width: 12),
+          IconButton(
+            onPressed: () => _copyToClipboard(value),
+            icon: Icon(
+              Icons.copy,
+              color: Theme.of(context).colorScheme.primary,
+              size: 20,
+            ),
+            style: IconButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           ),
-          if (showCopy && value.isNotEmpty) ...[
-            const SizedBox(width: 12),
-            IconButton(
-              onPressed: () => _copyToClipboard(value),
-              icon: const Icon(
-                Icons.copy,
-                color: Color(0xFFfbbf24),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSensitiveToggle(BuildContext context, Color typeColor) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline,
+        ),
+      ),
+      child: SwitchListTile(
+        title: Text(
+          'Show Sensitive Fields',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: Text(
+          'Reveal hidden passwords and sensitive data',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        value: _showSensitiveFields,
+        onChanged: (value) {
+          setState(() => _showSensitiveFields = value);
+        },
+        activeColor: typeColor,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+    );
+  }
+
+  Widget _buildMetadataCard(BuildContext context, Record record, Color typeColor) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 size: 20,
               ),
-              style: IconButton.styleFrom(
-                backgroundColor: const Color(0xFFfbbf24).withOpacity(0.1),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+              const SizedBox(width: 8),
+              Text(
+                'Record Information',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildMetadataRow(context, 'Category', record.category ?? 'No Category'),
+          _buildMetadataRow(context, 'Created', _formatDate(record.createdAt)),
+          _buildMetadataRow(context, 'Modified', _formatDate(record.modifiedAt)),
+          _buildMetadataRow(context, 'Record ID', record.id),
         ],
       ),
     );
   }
 
-  Widget _buildMetadataRow(String label, String value) {
+  Widget _buildMetadataRow(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -667,9 +563,8 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
             width: 80,
             child: Text(
               label,
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontSize: 14,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -678,10 +573,7 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                color: Colors.grey[300],
-                fontSize: 14,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
         ],
@@ -689,11 +581,188 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
     );
   }
 
-  String _formatFieldLabel(String key) {
-    return key
-        .split(RegExp(r'(?=[A-Z])'))
-        .map((word) => word[0].toUpperCase() + word.substring(1))
-        .join(' ');
+  void _showOptionsMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(
+                  Icons.edit,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                title: const Text('Edit Record'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ref.read(navigationServiceProvider).navigateToEditRecord(widget.recordId);
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.star,
+                  color: Theme.of(context).colorScheme.tertiary,
+                ),
+                title: const Text('Toggle Favorite'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  try {
+                    final repository = ref.read(safeRepositoryProvider);
+                    await repository.toggleFavorite(widget.recordId);
+                    ref.invalidate(selectedRecordProvider(widget.recordId));
+                    ref.invalidate(allRecordsProvider);
+                    ref.invalidate(favoriteRecordsProvider);
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.delete,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                title: const Text('Delete Record'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showDeleteConfirmation();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text('Delete Record'),
+        content: const Text('Are you sure you want to delete this record? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              try {
+                final repository = ref.read(safeRepositoryProvider);
+                await repository.deleteRecord(widget.recordId);
+                ref.invalidate(allRecordsProvider);
+                
+                if (mounted) {
+                  Navigator.of(context).pop(); // Go back to previous screen
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Record deleted'),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getIconForRecordType(RecordType type) {
+    switch (type) {
+      case RecordType.login:
+        return Icons.key;
+      case RecordType.creditCard:
+        return Icons.credit_card;
+      case RecordType.bankAccount:
+        return Icons.account_balance;
+      case RecordType.note:
+        return Icons.note;
+      case RecordType.address:
+        return Icons.location_on;
+      case RecordType.identity:
+        return Icons.badge;
+      case RecordType.wifi:
+        return Icons.wifi;
+      case RecordType.software:
+        return Icons.memory;
+      case RecordType.server:
+        return Icons.dns;
+      case RecordType.document:
+        return Icons.description;
+      case RecordType.membership:
+        return Icons.card_membership;
+      case RecordType.vehicle:
+        return Icons.directions_car;
+    }
+  }
+
+  String _getFieldLabel(RecordType type, String fieldKey) {
+    final fields = _getFieldsForType(type);
+    return fields[fieldKey] ?? fieldKey;
+  }
+
+  Map<String, String> _getFieldsForType(RecordType type) {
+    switch (type) {
+      case RecordType.login:
+        return AppConstants.loginFields;
+      case RecordType.creditCard:
+        return AppConstants.creditCardFields;
+      case RecordType.bankAccount:
+        return AppConstants.bankAccountFields;
+      case RecordType.address:
+        return AppConstants.addressFields;
+      case RecordType.identity:
+        return AppConstants.identityFields;
+      case RecordType.wifi:
+        return AppConstants.wifiFields;
+      case RecordType.software:
+        return AppConstants.softwareFields;
+      case RecordType.server:
+        return AppConstants.serverFields;
+      case RecordType.document:
+        return AppConstants.documentFields;
+      case RecordType.membership:
+        return AppConstants.membershipFields;
+      case RecordType.vehicle:
+        return AppConstants.vehicleFields;
+      case RecordType.note:
+        return {};
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -712,35 +781,4 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
       return '${date.day}/${date.month}/${date.year}';
     }
   }
-}
-
-// Custom painter for detail screen particles
-class DetailParticlePainter extends CustomPainter {
-  final double animationValue;
-
-  DetailParticlePainter(this.animationValue);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-
-    // Create subtle floating particles
-    for (int i = 0; i < 6; i++) {
-      final progress = (animationValue + i * 0.2) % 1.0;
-      final x = size.width * (0.1 + i * 0.15) + 
-                (15 * math.sin(progress * 2 * math.pi));
-      final y = size.height * (0.2 + progress * 0.6);
-      
-      paint.color = const Color(0xFFfbbf24).withOpacity(0.2);
-      
-      canvas.drawCircle(
-        Offset(x, y),
-        1.5,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

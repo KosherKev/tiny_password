@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/providers.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/record.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
-import 'dart:math' as math;
 
 class AddEditRecordScreen extends ConsumerStatefulWidget {
   final String? recordId;
@@ -21,24 +22,16 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
   final _formKey = GlobalKey<FormState>();
   late RecordType _selectedType;
   final _titleController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _urlController = TextEditingController();
-  final _cardNumberController = TextEditingController();
-  final _cardHolderController = TextEditingController();
-  final _expiryDateController = TextEditingController();
-  final _cvvController = TextEditingController();
-  final _bankNameController = TextEditingController();
-  final _accountNumberController = TextEditingController();
-  final _routingNumberController = TextEditingController();
   final _notesController = TextEditingController();
+  
+  // Field controllers for different record types
+  final Map<String, TextEditingController> _fieldControllers = {};
+  
   String _selectedCategory = 'Personal';
   bool _isFavorite = false;
-  bool _showPassword = false;
   bool _isLoading = false;
 
   late AnimationController _animationController;
-  late AnimationController _particleController;
   late Animation<double> _slideAnimation;
   late Animation<double> _fadeAnimation;
 
@@ -48,17 +41,12 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
     _selectedType = RecordType.login;
     
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
-    _particleController = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..repeat();
 
     _slideAnimation = Tween<double>(
-      begin: 50.0,
+      begin: 20.0,
       end: 0.0,
     ).animate(CurvedAnimation(
       parent: _animationController,
@@ -74,26 +62,51 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
     ));
 
     _animationController.forward();
+    _initializeFieldControllers();
     _loadRecord();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
-    _particleController.dispose();
     _titleController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
-    _urlController.dispose();
-    _cardNumberController.dispose();
-    _cardHolderController.dispose();
-    _expiryDateController.dispose();
-    _cvvController.dispose();
-    _bankNameController.dispose();
-    _accountNumberController.dispose();
-    _routingNumberController.dispose();
     _notesController.dispose();
+    for (final controller in _fieldControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
+  }
+
+  void _initializeFieldControllers() {
+    // Initialize controllers for all possible fields
+    final allFields = <String>[
+      // Login fields
+      'username', 'password', 'url', 'email', 'twoFactorSecret',
+      // Credit card fields
+      'cardNumber', 'cardholderName', 'expiryDate', 'cvv', 'pin', 'issuer',
+      // Bank account fields
+      'accountNumber', 'routingNumber', 'bankName', 'accountType', 'swiftCode', 'ibanNumber',
+      // Address fields
+      'addressLine1', 'addressLine2', 'city', 'state', 'postalCode', 'country', 'addressType',
+      // Identity fields
+      'documentType', 'documentNumber', 'fullName', 'dateOfBirth', 'issueDate', 'expiryDate', 'issuingAuthority', 'nationality',
+      // WiFi fields
+      'networkName', 'password', 'securityType', 'frequency', 'location',
+      // Software fields
+      'softwareName', 'licenseKey', 'version', 'purchaseDate', 'expiryDate', 'vendor', 'downloadUrl',
+      // Server fields
+      'serverName', 'ipAddress', 'port', 'username', 'password', 'privateKey', 'protocol', 'location',
+      // Document fields
+      'documentTitle', 'documentType', 'documentNumber', 'issueDate', 'expiryDate', 'issuingOrganization', 'fileLocation',
+      // Membership fields
+      'organizationName', 'membershipNumber', 'membershipType', 'username', 'password', 'startDate', 'expiryDate', 'benefits',
+      // Vehicle fields
+      'vehicleMake', 'vehicleModel', 'year', 'licensePlate', 'vin', 'registrationNumber', 'insurancePolicy', 'insuranceCompany',
+    ];
+
+    for (final field in allFields) {
+      _fieldControllers[field] = TextEditingController();
+    }
   }
 
   Future<void> _loadRecord() async {
@@ -110,28 +123,11 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
         _selectedCategory = record.category ?? 'Personal';
         _isFavorite = record.isFavorite;
 
-        switch (record.type) {
-          case RecordType.login:
-            final fields = record.fields;
-            _usernameController.text = fields['username'] ?? '';
-            _passwordController.text = fields['password'] ?? '';
-            _urlController.text = fields['url'] ?? '';
-            break;
-          case RecordType.creditCard:
-            final fields = record.fields;
-            _cardNumberController.text = fields['cardNumber'] ?? '';
-            _cardHolderController.text = fields['cardHolder'] ?? '';
-            _expiryDateController.text = fields['expiryDate'] ?? '';
-            _cvvController.text = fields['cvv'] ?? '';
-            break;
-          case RecordType.bankAccount:
-            final fields = record.fields;
-            _bankNameController.text = fields['bankName'] ?? '';
-            _accountNumberController.text = fields['accountNumber'] ?? '';
-            _routingNumberController.text = fields['routingNumber'] ?? '';
-            break;
-          case RecordType.note:
-            break;
+        // Populate field controllers
+        for (final entry in record.fields.entries) {
+          if (_fieldControllers.containsKey(entry.key)) {
+            _fieldControllers[entry.key]!.text = entry.value;
+          }
         }
       });
     } catch (e) {
@@ -139,11 +135,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error loading record: $e'),
-          backgroundColor: const Color(0xFFef4444),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     }
@@ -158,25 +150,13 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       final repository = ref.read(safeRepositoryProvider);
       final fields = <String, String>{};
 
-      switch (_selectedType) {
-        case RecordType.login:
-          fields['username'] = _usernameController.text;
-          fields['password'] = _passwordController.text;
-          fields['url'] = _urlController.text;
-          break;
-        case RecordType.creditCard:
-          fields['cardNumber'] = _cardNumberController.text;
-          fields['cardHolder'] = _cardHolderController.text;
-          fields['expiryDate'] = _expiryDateController.text;
-          fields['cvv'] = _cvvController.text;
-          break;
-        case RecordType.bankAccount:
-          fields['bankName'] = _bankNameController.text;
-          fields['accountNumber'] = _accountNumberController.text;
-          fields['routingNumber'] = _routingNumberController.text;
-          break;
-        case RecordType.note:
-          break;
+      // Get the relevant fields for the selected type
+      final relevantFields = _getFieldsForType(_selectedType);
+      for (final fieldKey in relevantFields.keys) {
+        final controller = _fieldControllers[fieldKey];
+        if (controller != null && controller.text.isNotEmpty) {
+          fields[fieldKey] = controller.text;
+        }
       }
 
       final now = DateTime.now();
@@ -209,11 +189,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(widget.recordId == null ? 'Record created' : 'Record updated'),
-          backgroundColor: const Color(0xFF22c55e),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          backgroundColor: Theme.of(context).colorScheme.primary,
         ),
       );
       
@@ -223,11 +199,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error saving record: $e'),
-          backgroundColor: const Color(0xFFef4444),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     } finally {
@@ -235,24 +207,425 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
     }
   }
 
-  void _generatePassword() {
-    ref.read(navigationServiceProvider).navigateToGeneratePassword();
-  }
-
-  Color _getRecordTypeColor(RecordType type) {
+  Map<String, String> _getFieldsForType(RecordType type) {
     switch (type) {
       case RecordType.login:
-        return const Color(0xFF3b82f6);
+        return AppConstants.loginFields;
       case RecordType.creditCard:
-        return const Color(0xFFef4444);
+        return AppConstants.creditCardFields;
       case RecordType.bankAccount:
-        return const Color(0xFF22c55e);
+        return AppConstants.bankAccountFields;
+      case RecordType.address:
+        return AppConstants.addressFields;
+      case RecordType.identity:
+        return AppConstants.identityFields;
+      case RecordType.wifi:
+        return AppConstants.wifiFields;
+      case RecordType.software:
+        return AppConstants.softwareFields;
+      case RecordType.server:
+        return AppConstants.serverFields;
+      case RecordType.document:
+        return AppConstants.documentFields;
+      case RecordType.membership:
+        return AppConstants.membershipFields;
+      case RecordType.vehicle:
+        return AppConstants.vehicleFields;
       case RecordType.note:
-        return const Color(0xFF8b5cf6);
+        return {};
     }
   }
 
-  IconData _getRecordTypeIcon(RecordType type) {
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final typeColor = AppTheme.getRecordTypeColor(_selectedType.name, isDarkMode);
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.background,
+      appBar: AppBar(
+        title: Text(widget.recordId == null ? 'Add Record' : 'Edit Record'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        actions: [
+          IconButton(
+            icon: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                _isFavorite ? Icons.star : Icons.star_border,
+                key: ValueKey(_isFavorite),
+                color: _isFavorite ? Theme.of(context).colorScheme.tertiary : null,
+              ),
+            ),
+            onPressed: () {
+              setState(() => _isFavorite = !_isFavorite);
+            },
+          ),
+        ],
+      ),
+      body: AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _fadeAnimation.value,
+            child: Transform.translate(
+              offset: Offset(0, _slideAnimation.value),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Record Type Selector
+                            _buildTypeSelector(context, typeColor),
+                            const SizedBox(height: 24),
+
+                            // Title Field
+                            CustomTextField(
+                              controller: _titleController,
+                              labelText: 'Title',
+                              validator: (value) =>
+                                  value?.isEmpty == true ? 'Please enter a title' : null,
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Category Selector
+                            _buildCategorySelector(context),
+
+                            const SizedBox(height: 24),
+
+                            // Dynamic Fields
+                            ..._buildTypeSpecificFields(context, typeColor),
+
+                            const SizedBox(height: 24),
+
+                            // Notes Field
+                            CustomTextField(
+                              controller: _notesController,
+                              labelText: 'Notes (Optional)',
+                              maxLines: 4,
+                            ),
+
+                            const SizedBox(height: 100), // Space for FAB
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+      floatingActionButton: _buildSaveButton(context),
+    );
+  }
+
+  Widget _buildTypeSelector(BuildContext context, Color typeColor) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              'Record Type',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: typeColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: DropdownButtonFormField<RecordType>(
+              value: _selectedType,
+              style: Theme.of(context).textTheme.bodyLarge,
+              dropdownColor: Theme.of(context).colorScheme.surface,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              items: RecordType.values.map((type) {
+                final typeInfo = AppConstants.recordTypes[type.name];
+                final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                final color = AppTheme.getRecordTypeColor(type.name, isDarkMode);
+                
+                return DropdownMenuItem(
+                  value: type,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          _getIconForRecordType(type),
+                          color: color,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              typeInfo?.name ?? type.displayName,
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (typeInfo?.description != null)
+                              Text(
+                                typeInfo!.description,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedType = value);
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategorySelector(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              'Category',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: DropdownButtonFormField<String>(
+              value: _selectedCategory,
+              style: Theme.of(context).textTheme.bodyLarge,
+              dropdownColor: Theme.of(context).colorScheme.surface,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              items: AppConstants.defaultCategories.map((category) {
+                return DropdownMenuItem(
+                  value: category,
+                  child: Row(
+                    children: [
+                      Icon(
+                        _getIconForCategory(category),
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        category,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedCategory = value);
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildTypeSpecificFields(BuildContext context, Color typeColor) {
+    final fields = _getFieldsForType(_selectedType);
+    if (fields.isEmpty) return [];
+
+    return [
+      Text(
+        'Details',
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: typeColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      const SizedBox(height: 16),
+      ...fields.entries.map((entry) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _buildField(context, entry.key, entry.value, typeColor),
+        );
+      }),
+    ];
+  }
+
+  Widget _buildField(BuildContext context, String fieldKey, String fieldLabel, Color typeColor) {
+    final controller = _fieldControllers[fieldKey];
+    if (controller == null) return const SizedBox.shrink();
+
+    final isPasswordField = fieldKey.toLowerCase().contains('password') || 
+                           fieldKey == 'cvv' || 
+                           fieldKey == 'pin' ||
+                           fieldKey == 'licenseKey' ||
+                           fieldKey == 'privateKey';
+
+    final isRequiredField = _isRequiredField(fieldKey, _selectedType);
+
+    // Special handling for dropdowns
+    if (_isDropdownField(fieldKey)) {
+      return _buildDropdownField(context, fieldKey, fieldLabel, typeColor);
+    }
+
+    // Special handling for date fields
+    if (_isDateField(fieldKey)) {
+      return _buildDateField(context, fieldKey, fieldLabel, controller);
+    }
+
+    return CustomTextField(
+      controller: controller,
+      labelText: fieldLabel + (isRequiredField ? ' *' : ''),
+      obscureText: isPasswordField,
+      keyboardType: _getKeyboardType(fieldKey),
+      suffix: _buildFieldSuffix(fieldKey, isPasswordField),
+      validator: isRequiredField ? (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter ${fieldLabel.toLowerCase()}';
+        }
+        return null;
+      } : null,
+    );
+  }
+
+  Widget? _buildFieldSuffix(String fieldKey, bool isPasswordField) {
+    if (isPasswordField && fieldKey == 'password') {
+      return IconButton(
+        icon: const Icon(Icons.auto_fix_high),
+        onPressed: () {
+          ref.read(navigationServiceProvider).navigateToGeneratePassword();
+        },
+      );
+    }
+    return null;
+  }
+
+  Widget _buildDropdownField(BuildContext context, String fieldKey, String fieldLabel, Color typeColor) {
+    final controller = _fieldControllers[fieldKey]!;
+    final options = _getDropdownOptions(fieldKey);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline,
+        ),
+      ),
+      child: DropdownButtonFormField<String>(
+        value: controller.text.isEmpty ? null : controller.text,
+        decoration: InputDecoration(
+          labelText: fieldLabel,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
+        dropdownColor: Theme.of(context).colorScheme.surface,
+        items: options.map((option) {
+          return DropdownMenuItem(
+            value: option,
+            child: Text(option),
+          );
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) {
+            controller.text = value;
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildDateField(BuildContext context, String fieldKey, String fieldLabel, TextEditingController controller) {
+    return CustomTextField(
+      controller: controller,
+      labelText: fieldLabel,
+      readOnly: true,
+      suffix: IconButton(
+        icon: const Icon(Icons.calendar_today),
+        onPressed: () async {
+          final date = await showDatePicker(
+            context: context,
+            initialDate: DateTime.now(),
+            firstDate: DateTime(1900),
+            lastDate: DateTime(2100),
+          );
+          if (date != null) {
+            controller.text = '${date.day}/${date.month}/${date.year}';
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildSaveButton(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      child: CustomButton(
+        text: widget.recordId == null ? 'Create Record' : 'Update Record',
+        onPressed: _isLoading ? null : _saveRecord,
+        isLoading: _isLoading,
+        width: double.infinity,
+        icon: widget.recordId == null ? Icons.add : Icons.save,
+      ),
+    );
+  }
+
+  // Helper methods
+  IconData _getIconForRecordType(RecordType type) {
     switch (type) {
       case RecordType.login:
         return Icons.key;
@@ -262,487 +635,126 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
         return Icons.account_balance;
       case RecordType.note:
         return Icons.note;
+      case RecordType.address:
+        return Icons.location_on;
+      case RecordType.identity:
+        return Icons.badge;
+      case RecordType.wifi:
+        return Icons.wifi;
+      case RecordType.software:
+        return Icons.memory;
+      case RecordType.server:
+        return Icons.dns;
+      case RecordType.document:
+        return Icons.description;
+      case RecordType.membership:
+        return Icons.card_membership;
+      case RecordType.vehicle:
+        return Icons.directions_car;
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0f0f0f),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1a1a1a),
-              Color(0xFF0f0f0f),
-              Color(0xFF2d2d2d),
-            ],
-          ),
-        ),
-        child: Stack(
-          children: [
-            // Marble texture overlay
-            Container(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: const AssetImage('assets/images/marble_texture.png'),
-                  fit: BoxFit.cover,
-                  opacity: 0.05,
-                  colorFilter: ColorFilter.mode(
-                    Colors.white.withOpacity(0.02),
-                    BlendMode.overlay,
-                  ),
-                ),
-              ),
-            ),
-
-            // Floating particles
-            AnimatedBuilder(
-              animation: _particleController,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: EditParticlePainter(_particleController.value),
-                  size: Size.infinite,
-                );
-              },
-            ),
-
-            // Main content
-            AnimatedBuilder(
-              animation: _animationController,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeAnimation.value,
-                  child: Transform.translate(
-                    offset: Offset(0, _slideAnimation.value),
-                    child: CustomScrollView(
-                      slivers: [
-                        // Modern App Bar
-                        SliverAppBar(
-                          expandedHeight: 120,
-                          floating: false,
-                          pinned: true,
-                          backgroundColor: Colors.transparent,
-                          leading: IconButton(
-                            icon: const Icon(Icons.close, color: Colors.white),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                          actions: [
-                            IconButton(
-                              icon: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                child: Icon(
-                                  _isFavorite ? Icons.star : Icons.star_border,
-                                  key: ValueKey(_isFavorite),
-                                  color: _isFavorite ? const Color(0xFFfbbf24) : Colors.grey[400],
-                                ),
-                              ),
-                              onPressed: () {
-                                setState(() => _isFavorite = !_isFavorite);
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          flexibleSpace: FlexibleSpaceBar(
-                            titlePadding: const EdgeInsets.only(left: 60, bottom: 16),
-                            title: Row(
-                              children: [
-                                Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        _getRecordTypeColor(_selectedType),
-                                        _getRecordTypeColor(_selectedType).withOpacity(0.8),
-                                      ],
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    _getRecordTypeIcon(_selectedType),
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  widget.recordId == null ? 'Add Record' : 'Edit Record',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                        // Content
-                        SliverPadding(
-                          padding: const EdgeInsets.all(24),
-                          sliver: SliverList(
-                            delegate: SliverChildListDelegate([
-                              Form(
-                                key: _formKey,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Record type selector
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(16),
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.white.withOpacity(0.08),
-                                            Colors.white.withOpacity(0.04),
-                                          ],
-                                        ),
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.1),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Padding(
-                                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                                            child: Text(
-                                              'Record Type',
-                                              style: TextStyle(
-                                                color: const Color(0xFFfbbf24),
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                letterSpacing: 0.5,
-                                              ),
-                                            ),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                                            child: DropdownButtonFormField<RecordType>(
-                                              value: _selectedType,
-                                              style: const TextStyle(color: Colors.white),
-                                              dropdownColor: const Color(0xFF1a1a1a),
-                                              decoration: const InputDecoration(
-                                                border: InputBorder.none,
-                                                contentPadding: EdgeInsets.zero,
-                                              ),
-                                              items: RecordType.values.map((type) {
-                                                return DropdownMenuItem(
-                                                  value: type,
-                                                  child: Row(
-                                                    children: [
-                                                      Icon(
-                                                        _getRecordTypeIcon(type),
-                                                        color: _getRecordTypeColor(type),
-                                                        size: 20,
-                                                      ),
-                                                      const SizedBox(width: 12),
-                                                      Text(
-                                                        type.toString().split('.').last.toUpperCase(),
-                                                        style: const TextStyle(
-                                                          fontSize: 16,
-                                                          fontWeight: FontWeight.w500,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                              }).toList(),
-                                              onChanged: (value) {
-                                                if (value != null) {
-                                                  setState(() => _selectedType = value);
-                                                }
-                                              },
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    const SizedBox(height: 24),
-
-                                    // Title field
-                                    CustomTextField(
-                                      controller: _titleController,
-                                      labelText: 'Title',
-                                      validator: (value) =>
-                                          value?.isEmpty == true ? 'Please enter a title' : null,
-                                    ),
-
-                                    const SizedBox(height: 16),
-
-                                    // Category selector
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(16),
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.white.withOpacity(0.08),
-                                            Colors.white.withOpacity(0.04),
-                                          ],
-                                        ),
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.1),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Padding(
-                                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                                            child: Text(
-                                              'Category',
-                                              style: TextStyle(
-                                                color: const Color(0xFFfbbf24),
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                letterSpacing: 0.5,
-                                              ),
-                                            ),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                                            child: DropdownButtonFormField<String>(
-                                              value: _selectedCategory,
-                                              style: const TextStyle(color: Colors.white),
-                                              dropdownColor: const Color(0xFF1a1a1a),
-                                              decoration: const InputDecoration(
-                                                border: InputBorder.none,
-                                                contentPadding: EdgeInsets.zero,
-                                              ),
-                                              items: ['Personal', 'Work', 'Finance', 'Shopping', 'Social', 'Other']
-                                                  .map((category) => DropdownMenuItem(
-                                                        value: category,
-                                                        child: Text(
-                                                          category,
-                                                          style: const TextStyle(
-                                                            fontSize: 16,
-                                                            fontWeight: FontWeight.w500,
-                                                          ),
-                                                        ),
-                                                      ))
-                                                  .toList(),
-                                              onChanged: (value) {
-                                                if (value != null) {
-                                                  setState(() => _selectedCategory = value);
-                                                }
-                                              },
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    const SizedBox(height: 24),
-
-                                    // Dynamic fields based on record type
-                                    ..._buildTypeSpecificFields(),
-
-                                    const SizedBox(height: 16),
-
-                                    // Notes field
-                                    CustomTextField(
-                                      controller: _notesController,
-                                      labelText: 'Notes (Optional)',
-                                      maxLines: 4,
-                                    ),
-
-                                    const SizedBox(height: 40),
-
-                                    // Save button
-                                    CustomButton(
-                                      text: widget.recordId == null ? 'Create Record' : 'Update Record',
-                                      onPressed: _isLoading ? null : _saveRecord,
-                                      isLoading: _isLoading,
-                                      width: double.infinity,
-                                      icon: widget.recordId == null ? Icons.add : Icons.save,
-                                    ),
-
-                                    const SizedBox(height: 100),
-                                  ],
-                                ),
-                              ),
-                            ]),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+  IconData _getIconForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'personal':
+        return Icons.person;
+      case 'work':
+        return Icons.work;
+      case 'finance':
+        return Icons.account_balance_wallet;
+      case 'shopping':
+        return Icons.shopping_bag;
+      case 'social':
+        return Icons.group;
+      case 'education':
+        return Icons.school;
+      case 'travel':
+        return Icons.flight;
+      case 'gaming':
+        return Icons.sports_esports;
+      case 'health':
+        return Icons.local_hospital;
+      case 'utilities':
+        return Icons.build;
+      case 'entertainment':
+        return Icons.movie;
+      case 'business':
+        return Icons.business;
+      case 'sports':
+        return Icons.sports_soccer;
+      case 'news':
+        return Icons.newspaper;
+      case 'streaming':
+        return Icons.play_circle;
+      default:
+        return Icons.folder;
+    }
   }
 
-  List<Widget> _buildTypeSpecificFields() {
-    switch (_selectedType) {
+  bool _isRequiredField(String fieldKey, RecordType type) {
+    switch (type) {
       case RecordType.login:
-        return _buildLoginFields();
+        return ['username', 'password'].contains(fieldKey);
       case RecordType.creditCard:
-        return _buildCreditCardFields();
+        return ['cardNumber', 'cardholderName', 'expiryDate', 'cvv'].contains(fieldKey);
       case RecordType.bankAccount:
-        return _buildBankAccountFields();
+        return ['accountNumber', 'bankName'].contains(fieldKey);
+      case RecordType.address:
+        return ['addressLine1', 'city'].contains(fieldKey);
+      case RecordType.identity:
+        return ['documentType', 'documentNumber'].contains(fieldKey);
+      case RecordType.wifi:
+        return ['networkName'].contains(fieldKey);
+      case RecordType.software:
+        return ['softwareName'].contains(fieldKey);
+      case RecordType.server:
+        return ['serverName'].contains(fieldKey);
+      case RecordType.document:
+        return ['documentTitle'].contains(fieldKey);
+      case RecordType.membership:
+        return ['organizationName'].contains(fieldKey);
+      case RecordType.vehicle:
+        return ['vehicleMake', 'vehicleModel'].contains(fieldKey);
       case RecordType.note:
+        return false;
+    }
+  }
+
+  bool _isDropdownField(String fieldKey) {
+    return ['documentType', 'addressType', 'securityType', 'accountType', 'membershipType'].contains(fieldKey);
+  }
+
+  bool _isDateField(String fieldKey) {
+    return ['dateOfBirth', 'issueDate', 'expiryDate', 'purchaseDate', 'startDate'].contains(fieldKey);
+  }
+
+  TextInputType _getKeyboardType(String fieldKey) {
+    if (['cardNumber', 'cvv', 'accountNumber', 'routingNumber', 'port', 'year'].contains(fieldKey)) {
+      return TextInputType.number;
+    }
+    if (['email'].contains(fieldKey)) {
+      return TextInputType.emailAddress;
+    }
+    if (['url', 'downloadUrl'].contains(fieldKey)) {
+      return TextInputType.url;
+    }
+    return TextInputType.text;
+  }
+
+  List<String> _getDropdownOptions(String fieldKey) {
+    switch (fieldKey) {
+      case 'documentType':
+        return AppConstants.identityDocumentTypes;
+      case 'addressType':
+        return AppConstants.addressTypes;
+      case 'securityType':
+        return AppConstants.wifiSecurityTypes;
+      case 'accountType':
+        return AppConstants.bankAccountTypes;
+      case 'membershipType':
+        return ['Standard', 'Premium', 'VIP', 'Student', 'Senior', 'Family', 'Corporate'];
+      default:
         return [];
     }
   }
-
-  List<Widget> _buildLoginFields() {
-    return [
-      CustomTextField(
-        controller: _usernameController,
-        labelText: 'Username',
-        validator: (value) =>
-            value?.isEmpty == true ? 'Please enter a username' : null,
-      ),
-      const SizedBox(height: 16),
-      CustomTextField(
-        controller: _passwordController,
-        labelText: 'Password',
-        obscureText: !_showPassword,
-        validator: (value) =>
-            value?.isEmpty == true ? 'Please enter a password' : null,
-        suffix: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(
-                _showPassword ? Icons.visibility_off : Icons.visibility,
-                color: const Color(0xFFfbbf24),
-              ),
-              onPressed: () {
-                setState(() => _showPassword = !_showPassword);
-              },
-            ),
-            IconButton(
-              icon: const Icon(
-                Icons.auto_fix_high,
-                color: Color(0xFFfbbf24),
-              ),
-              onPressed: _generatePassword,
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 16),
-      CustomTextField(
-        controller: _urlController,
-        labelText: 'Website URL (Optional)',
-        keyboardType: TextInputType.url,
-      ),
-    ];
-  }
-
-  List<Widget> _buildCreditCardFields() {
-    return [
-      CustomTextField(
-        controller: _cardNumberController,
-        labelText: 'Card Number',
-        keyboardType: TextInputType.number,
-        validator: (value) =>
-            value?.isEmpty == true ? 'Please enter a card number' : null,
-      ),
-      const SizedBox(height: 16),
-      CustomTextField(
-        controller: _cardHolderController,
-        labelText: 'Card Holder Name',
-        validator: (value) =>
-            value?.isEmpty == true ? 'Please enter the card holder name' : null,
-      ),
-      const SizedBox(height: 16),
-      Row(
-        children: [
-          Expanded(
-            child: CustomTextField(
-              controller: _expiryDateController,
-              labelText: 'Expiry Date (MM/YY)',
-              keyboardType: TextInputType.datetime,
-              validator: (value) =>
-                  value?.isEmpty == true ? 'Please enter expiry date' : null,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: CustomTextField(
-              controller: _cvvController,
-              labelText: 'CVV',
-              keyboardType: TextInputType.number,
-              obscureText: true,
-              validator: (value) =>
-                  value?.isEmpty == true ? 'Please enter CVV' : null,
-            ),
-          ),
-        ],
-      ),
-    ];
-  }
-
-  List<Widget> _buildBankAccountFields() {
-    return [
-      CustomTextField(
-        controller: _bankNameController,
-        labelText: 'Bank Name',
-        validator: (value) =>
-            value?.isEmpty == true ? 'Please enter bank name' : null,
-      ),
-      const SizedBox(height: 16),
-      CustomTextField(
-        controller: _accountNumberController,
-        labelText: 'Account Number',
-        keyboardType: TextInputType.number,
-        validator: (value) =>
-            value?.isEmpty == true ? 'Please enter account number' : null,
-      ),
-      const SizedBox(height: 16),
-      CustomTextField(
-        controller: _routingNumberController,
-        labelText: 'Routing Number',
-        keyboardType: TextInputType.number,
-        validator: (value) =>
-            value?.isEmpty == true ? 'Please enter routing number' : null,
-      ),
-    ];
-  }
-}
-
-// Custom painter for edit screen particles
-class EditParticlePainter extends CustomPainter {
-  final double animationValue;
-
-  EditParticlePainter(this.animationValue);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-
-    // Create flowing particles
-    for (int i = 0; i < 8; i++) {
-      final progress = (animationValue + i * 0.125) % 1.0;
-      final x = size.width * (0.1 + i * 0.1) + 
-                (20 * math.sin(progress * 3 * math.pi));
-      final y = size.height * (0.1 + progress * 0.8);
-      
-      paint.color = i % 2 == 0 
-        ? const Color(0xFFfbbf24).withOpacity(0.3)
-        : Colors.white.withOpacity(0.2);
-      
-      final radius = 1 + math.sin(progress * 4 * math.pi) * 0.5;
-      
-      canvas.drawCircle(
-        Offset(x, y),
-        radius,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

@@ -1,11 +1,8 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tiny_password/core/providers/providers.dart';
 import 'package:tiny_password/presentation/screens/auth/setup_master_password_screen.dart';
 import 'package:tiny_password/presentation/widgets/custom_button.dart';
-import 'package:tiny_password/presentation/widgets/snackbar.dart';
 import 'package:tiny_password/presentation/widgets/custom_text_field.dart';
 
 class UnlockScreen extends ConsumerStatefulWidget {
@@ -22,20 +19,15 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
   bool _isLoading = false;
   bool _isBiometricsAvailable = false;
   late AnimationController _animationController;
-  late AnimationController _particleController;
   late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-    _particleController = AnimationController(
-      duration: const Duration(seconds: 3),
-      vsync: this,
-    )..repeat();
 
     _fadeAnimation = Tween<double>(
       begin: 0.0,
@@ -52,7 +44,6 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
   @override
   void dispose() {
     _animationController.dispose();
-    _particleController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -82,34 +73,28 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
       setState(() => _isLoading = true);
 
       final authService = ref.read(authServiceProvider);
-      final repositoryNotifier = ref.read(repositoryStateProvider.notifier);
       
       final success = await authService.unlockWithBiometrics();
 
       if (success && mounted) {
-        // Note: No need to call initializeRecordEncryption as unlockWithBiometrics already initializes encryption
-        
         ref.read(isAuthenticatedProvider.notifier).state = true;
         
         ref.read(navigationServiceProvider).navigateToHome();
-        CustomSnackBar.showSuccess(
-          context: context,
-          message: 'Biometric unlock successful!',
-        );
+        _showSnackBar('Biometric unlock successful!');
       } else {
         if (mounted) {
-          CustomSnackBar.showError(
-            context: context,
-            message: 'Biometric authentication failed. Please use your master password.',
+          _showSnackBar(
+            'Biometric authentication failed. Please use your master password.',
+            isError: true,
           );
         }
       }
     } catch (e) {
       print('Biometric authentication error: $e');
       if (mounted) {
-        CustomSnackBar.showError(
-          context: context,
-          message: 'Biometric authentication failed. Please use your master password.',
+        _showSnackBar(
+          'Biometric authentication failed. Please use your master password.',
+          isError: true,
         );
       }
     } finally {
@@ -124,334 +109,249 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
       setState(() => _isLoading = true);
 
       final authService = ref.read(authServiceProvider);
-      final repositoryNotifier = ref.read(repositoryStateProvider.notifier);
       
       final isValid = await authService.verifyMasterPassword(_passwordController.text);
 
       if (!isValid) {
         if (mounted) {
-          CustomSnackBar.showError(
-            context: context,
-            message: 'Invalid password',
-          );
+          _showSnackBar('Invalid password', isError: true);
         }
         return;
       }
 
-      // Note: No need to call initializeRecordEncryption as verifyMasterPassword already initializes encryption
       ref.read(isAuthenticatedProvider.notifier).state = true;
 
       if (mounted) {
         ref.read(navigationServiceProvider).navigateToHome();
-        CustomSnackBar.showSuccess(
-          context: context,
-          message: 'Welcome back!',
-        );
+        _showSnackBar('Welcome back!');
       }
     } catch (e) {
       print('Unlock error: $e');
       if (mounted) {
-        CustomSnackBar.showError(
-          context: context,
-          message: e.toString(),
-        );
+        _showSnackBar(e.toString(), isError: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError 
+            ? Theme.of(context).colorScheme.error
+            : Theme.of(context).colorScheme.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1a1a1a), // Dark marble
-              Color(0xFF2d2d2d), // Medium dark
-              Color(0xFF0f0f0f), // Very dark
-            ],
-          ),
-        ),
-        child: Stack(
-          children: [
-            // Marble texture overlay
-            Container(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: const AssetImage('assets/images/marble_texture.png'),
-                  fit: BoxFit.cover,
-                  opacity: 0.1,
-                  colorFilter: ColorFilter.mode(
-                    Colors.white.withOpacity(0.05),
-                    BlendMode.overlay,
+      backgroundColor: Theme.of(context).colorScheme.background,
+      body: SafeArea(
+        child: AnimatedBuilder(
+          animation: _fadeAnimation,
+          builder: (context, child) {
+            return Opacity(
+              opacity: _fadeAnimation.value,
+              child: Transform.translate(
+                offset: Offset(0, 50 * (1 - _fadeAnimation.value)),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 80),
+
+                        // Logo with Bauhaus styling
+                        _buildLogo(context),
+
+                        const SizedBox(height: 40),
+
+                        // Title
+                        Text(
+                          'Welcome Back',
+                          style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        Text(
+                          'Enter your master password to unlock your vault',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+
+                        const SizedBox(height: 60),
+
+                        // Password input
+                        CustomTextField(
+                          controller: _passwordController,
+                          labelText: 'Master Password',
+                          obscureText: true,
+                          autofocus: !_isBiometricsAvailable,
+                          textInputAction: TextInputAction.done,
+                          onChanged: (_) => setState(() {}),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your password';
+                            }
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Unlock button
+                        CustomButton(
+                          text: 'Unlock Vault',
+                          onPressed: _passwordController.text.isEmpty || _isLoading 
+                            ? null 
+                            : _unlockWithPassword,
+                          isLoading: _isLoading,
+                          width: double.infinity,
+                          icon: Icons.lock_open,
+                        ),
+
+                        if (_isBiometricsAvailable) ...[
+                          const SizedBox(height: 24),
+                          
+                          // Divider
+                          _buildDivider(context),
+
+                          const SizedBox(height: 24),
+
+                          // Biometric button
+                          CustomButton(
+                            text: 'Biometric Authentication',
+                            onPressed: _isLoading ? null : _authenticateWithBiometrics,
+                            icon: Icons.fingerprint,
+                            isOutlined: true,
+                            width: double.infinity,
+                          ),
+                        ],
+
+                        const SizedBox(height: 40),
+
+                        // Forgot password
+                        TextButton(
+                          onPressed: () => _showResetConfirmation(),
+                          child: Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 40),
+
+                        // Security notice
+                        _buildSecurityNotice(context),
+                      ],
+                    ),
                   ),
                 ),
               ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogo(BuildContext context) {
+    return Container(
+      width: 120,
+      height: 120,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+            blurRadius: 20,
+            spreadRadius: 5,
+          ),
+        ],
+      ),
+      child: Icon(
+        Icons.lock_outline,
+        size: 60,
+        color: Theme.of(context).colorScheme.onPrimary,
+      ),
+    );
+  }
+
+  Widget _buildDivider(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'or use',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+        ),
+      ],
+    );
+  }
 
-            // Animated gold particles
-            AnimatedBuilder(
-              animation: _particleController,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: ParticlePainter(_particleController.value),
-                  size: Size.infinite,
-                );
-              },
-            ),
-
-            // Main content
-            SafeArea(
-              child: AnimatedBuilder(
-                animation: _fadeAnimation,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _fadeAnimation.value,
-                    child: Transform.translate(
-                      offset: Offset(0, 50 * (1 - _fadeAnimation.value)),
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              const SizedBox(height: 80),
-
-                              // Logo with marble effect
-                              Container(
-                                width: 120,
-                                height: 120,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(30),
-                                  gradient: const LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Color(0xFFfbbf24), // Gold
-                                      Color(0xFFf59e0b), // Darker gold
-                                      Color(0xFFd97706), // Amber
-                                    ],
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFFfbbf24).withOpacity(0.3),
-                                      blurRadius: 20,
-                                      spreadRadius: 5,
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.lock_outline,
-                                  size: 60,
-                                  color: Colors.white,
-                                ),
-                              ),
-
-                              const SizedBox(height: 40),
-
-                              // Title with marble text effect
-                              ShaderMask(
-                                shaderCallback: (bounds) => const LinearGradient(
-                                  colors: [
-                                    Colors.white,
-                                    Color(0xFFf3f4f6),
-                                    Color(0xFFfbbf24),
-                                  ],
-                                ).createShader(bounds),
-                                child: const Text(
-                                  'Welcome Back',
-                                  style: TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              Text(
-                                'Enter your master password to unlock your vault',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey[400],
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-
-                              const SizedBox(height: 60),
-
-                              // Password input with marble styling
-                              Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Colors.white.withOpacity(0.1),
-                                      Colors.white.withOpacity(0.05),
-                                    ],
-                                  ),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.2),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: CustomTextField(
-                                  controller: _passwordController,
-                                  labelText: 'Master Password',
-                                  obscureText: true,
-                                  autofocus: !_isBiometricsAvailable,
-                                  textInputAction: TextInputAction.done,
-                                  onChanged: (_) => setState(() {}),
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter your password';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                              ),
-
-                              const SizedBox(height: 32),
-
-                              // Unlock button with gold gradient
-                              CustomButton(
-                                text: 'Unlock Vault',
-                                onPressed: _passwordController.text.isEmpty || _isLoading 
-                                  ? null 
-                                  : _unlockWithPassword,
-                                isLoading: _isLoading,
-                                width: double.infinity,
-                              ),
-
-                              if (_isBiometricsAvailable) ...[
-                                const SizedBox(height: 24),
-                                
-                                // Divider with marble styling
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Container(
-                                        height: 1,
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              Colors.transparent,
-                                              Colors.grey[600]!,
-                                              Colors.transparent,
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                                      child: Text(
-                                        'or use',
-                                        style: TextStyle(
-                                          color: Colors.grey[400],
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Container(
-                                        height: 1,
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              Colors.transparent,
-                                              Colors.grey[600]!,
-                                              Colors.transparent,
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 24),
-
-                                // Biometric button
-                                CustomButton(
-                                  text: 'Biometric Authentication',
-                                  onPressed: _isLoading ? null : _authenticateWithBiometrics,
-                                  icon: Icons.fingerprint,
-                                  isOutlined: true,
-                                  width: double.infinity,
-                                ),
-                              ],
-
-                              const SizedBox(height: 40),
-
-                              // Forgot password with marble styling
-                              TextButton(
-                                onPressed: () => _showResetConfirmation(),
-                                child: Text(
-                                  'Forgot Password?',
-                                  style: TextStyle(
-                                    color: const Color(0xFFfbbf24),
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 40),
-
-                              // Security notice
-                              Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16),
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      const Color(0xFFfbbf24).withOpacity(0.1),
-                                      const Color(0xFFf59e0b).withOpacity(0.05),
-                                    ],
-                                  ),
-                                  border: Border.all(
-                                    color: const Color(0xFFfbbf24).withOpacity(0.3),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.security,
-                                      color: Color(0xFFfbbf24),
-                                      size: 24,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        'Your data is protected with military-grade AES-256 encryption',
-                                        style: TextStyle(
-                                          color: const Color(0xFFfbbf24),
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
+  Widget _buildSecurityNotice(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.security,
+            color: Theme.of(context).colorScheme.primary,
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Your data is protected with military-grade AES-256 encryption',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -460,18 +360,16 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1a1a1a),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: Colors.white.withOpacity(0.1),
+            color: Theme.of(context).colorScheme.outline,
           ),
         ),
         title: Text(
           'Forgot Password?',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -480,9 +378,8 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
           'If you\'ve forgotten it, you\'ll need to clear all app data '
           'and start fresh.\n\n'
           'This will permanently delete all your saved passwords.',
-          style: TextStyle(
-            color: Colors.grey[300],
-            fontSize: 14,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         actions: [
@@ -490,12 +387,14 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
             onPressed: () => Navigator.of(context).pop(),
             child: Text(
               'Cancel',
-              style: TextStyle(color: Colors.grey[400]),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           TextButton(
             style: TextButton.styleFrom(
-              foregroundColor: Colors.red[400],
+              foregroundColor: Theme.of(context).colorScheme.error,
             ),
             onPressed: () {
               Navigator.of(context).pop();
@@ -512,18 +411,17 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1a1a1a),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: Colors.red.withOpacity(0.3),
+            color: Theme.of(context).colorScheme.error.withOpacity(0.3),
           ),
         ),
         title: Text(
           'Clear All Data',
-          style: TextStyle(
-            color: Colors.red[400],
-            fontSize: 20,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: Theme.of(context).colorScheme.error,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -533,9 +431,8 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
           '• All app settings\n'
           '• Master password\n\n'
           'This action cannot be undone.',
-          style: TextStyle(
-            color: Colors.grey[300],
-            fontSize: 14,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         actions: [
@@ -543,12 +440,14 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
             onPressed: () => Navigator.of(context).pop(),
             child: Text(
               'Cancel',
-              style: TextStyle(color: Colors.grey[400]),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           TextButton(
             style: TextButton.styleFrom(
-              foregroundColor: Colors.red[400],
+              foregroundColor: Theme.of(context).colorScheme.error,
             ),
             onPressed: () async {
               Navigator.of(context).pop();
@@ -582,10 +481,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
                 ref.invalidate(isBiometricsEnabledProvider);
                 
                 if (mounted) {
-                  CustomSnackBar.showSuccess(
-                    context: context,
-                    message: 'All data cleared. Redirecting to setup...',
-                  );
+                  _showSnackBar('All data cleared. Redirecting to setup...');
                   
                   // Navigate to setup screen
                   await Future.delayed(const Duration(seconds: 1));
@@ -601,10 +497,7 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
                 }
               } catch (e) {
                 if (mounted) {
-                  CustomSnackBar.showError(
-                    context: context,
-                    message: 'Failed to clear data: $e',
-                  );
+                  _showSnackBar('Failed to clear data: $e', isError: true);
                   
                   // Force navigation to setup anyway
                   Navigator.of(context).pushAndRemoveUntil(
@@ -622,35 +515,4 @@ class _UnlockScreenState extends ConsumerState<UnlockScreen>
       ),
     );
   }
-}
-
-// Custom painter for floating gold particles
-class ParticlePainter extends CustomPainter {
-  final double animationValue;
-
-  ParticlePainter(this.animationValue);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFfbbf24).withOpacity(0.6)
-      ..style = PaintingStyle.fill;
-
-    // Create floating particles
-    for (int i = 0; i < 15; i++) {
-      final x = (size.width * (i * 0.1 + 0.1)) + 
-                (20 * math.sin(animationValue * 2 * math.pi + i));
-      final y = (size.height * (i * 0.05 + 0.1)) + 
-                (30 * math.cos(animationValue * 2 * math.pi + i * 0.5));
-      
-      canvas.drawCircle(
-        Offset(x % size.width, y % size.height),
-        2 + math.sin(animationValue * 4 * math.pi + i) * 1,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
