@@ -17,7 +17,11 @@ class AttachmentService {
   static const _uuid = Uuid();
   static const int _maxImageSize = 2 * 1024 * 1024; // 2MB
   static const int _maxPdfSize = 10 * 1024 * 1024; // 10MB
-  static const int _imageQuality = 85; // JPEG quality
+  static const int _highQuality = 90; // High quality JPEG
+  static const int _mediumQuality = 75; // Medium quality JPEG
+  static const int _lowQuality = 60; // Low quality JPEG
+  static const int _maxDimension = 1920; // Max width/height
+  static const int _thumbnailSize = 512; // Thumbnail size
   
   final EncryptionService _encryptionService;
   final ImagePicker _imagePicker = ImagePicker();
@@ -62,9 +66,9 @@ class AttachmentService {
       
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.camera,
-        imageQuality: _imageQuality,
-        maxWidth: 1920,
-        maxHeight: 1920,
+        imageQuality: _mediumQuality,
+        maxWidth: _maxDimension.toDouble(),
+        maxHeight: _maxDimension.toDouble(),
       );
       
       if (image == null) return null;
@@ -85,9 +89,9 @@ class AttachmentService {
       
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: _imageQuality,
-        maxWidth: 1920,
-        maxHeight: 1920,
+        imageQuality: _mediumQuality,
+        maxWidth: _maxDimension.toDouble(),
+        maxHeight: _maxDimension.toDouble(),
       );
       
       if (image == null) return null;
@@ -131,22 +135,18 @@ class AttachmentService {
   /// Process and save image file
   Future<Attachment> _processImageFile(XFile imageFile) async {
     final file = File(imageFile.path);
-    final fileSize = await file.length();
+    final originalBytes = await file.readAsBytes();
+    final fileSize = originalBytes.length;
     
-    // Compress image if it's too large
-    Uint8List imageBytes;
-    if (fileSize > _maxImageSize) {
-      imageBytes = await _compressImage(await file.readAsBytes());
-    } else {
-      imageBytes = await file.readAsBytes();
-    }
+    // Always optimize images for better storage efficiency
+    final optimizedBytes = await _optimizeImage(originalBytes, fileSize);
     
     // Generate unique filename
     final attachmentId = _uuid.v4();
     final fileName = '${path.basenameWithoutExtension(imageFile.name)}_$attachmentId.jpg';
     
     // Encrypt and save
-    final encryptedBytes = _encryptionService.encryptBytes(imageBytes);
+    final encryptedBytes = _encryptionService.encryptBytes(optimizedBytes);
     final attachmentsDir = await _getAttachmentsDirectory();
     final savedFile = File(path.join(attachmentsDir.path, fileName));
     await savedFile.writeAsBytes(encryptedBytes);
@@ -156,7 +156,7 @@ class AttachmentService {
       fileName: path.basename(imageFile.name),
       type: AttachmentType.image,
       filePath: savedFile.path,
-      fileSize: imageBytes.length,
+      fileSize: optimizedBytes.length,
       createdAt: DateTime.now(),
     );
   }
@@ -185,31 +185,82 @@ class AttachmentService {
     );
   }
 
-  /// Compress image to reduce file size
-  Future<Uint8List> _compressImage(Uint8List imageBytes) async {
+  /// Optimize image with adaptive compression based on file size and content
+  Future<Uint8List> _optimizeImage(Uint8List imageBytes, int originalSize) async {
     final image = img.decodeImage(imageBytes);
     if (image == null) return imageBytes;
     
-    // Calculate new dimensions while maintaining aspect ratio
+    // Determine target quality based on original file size
+    int targetQuality;
+    if (originalSize > _maxImageSize * 2) {
+      targetQuality = _lowQuality; // Aggressive compression for very large files
+    } else if (originalSize > _maxImageSize) {
+      targetQuality = _mediumQuality; // Medium compression for large files
+    } else {
+      targetQuality = _highQuality; // High quality for smaller files
+    }
+    
+    // Calculate optimal dimensions while maintaining aspect ratio
     int newWidth = image.width;
     int newHeight = image.height;
     
-    if (newWidth > 1920 || newHeight > 1920) {
+    // Resize if dimensions are too large
+    if (newWidth > _maxDimension || newHeight > _maxDimension) {
       final aspectRatio = newWidth / newHeight;
       if (newWidth > newHeight) {
-        newWidth = 1920;
-        newHeight = (1920 / aspectRatio).round();
+        newWidth = _maxDimension;
+        newHeight = (_maxDimension / aspectRatio).round();
       } else {
-        newHeight = 1920;
-        newWidth = (1920 * aspectRatio).round();
+        newHeight = _maxDimension;
+        newWidth = (_maxDimension * aspectRatio).round();
       }
     }
     
-    // Resize image
-    final resizedImage = img.copyResize(image, width: newWidth, height: newHeight);
+    // Apply additional size reduction for very large images
+    if (originalSize > _maxImageSize * 3) {
+      newWidth = (newWidth * 0.8).round();
+      newHeight = (newHeight * 0.8).round();
+    }
     
-    // Encode as JPEG with quality compression
-    return Uint8List.fromList(img.encodeJpg(resizedImage, quality: _imageQuality));
+    // Resize image with high-quality interpolation
+    final resizedImage = img.copyResize(
+      image, 
+      width: newWidth, 
+      height: newHeight,
+      interpolation: img.Interpolation.cubic,
+    );
+    
+    // Apply additional optimizations
+    final optimizedImage = _applyImageOptimizations(resizedImage);
+    
+    // Encode as JPEG with adaptive quality
+    var compressedBytes = Uint8List.fromList(
+      img.encodeJpg(optimizedImage, quality: targetQuality)
+    );
+    
+    // If still too large, apply progressive compression
+    if (compressedBytes.length > _maxImageSize && targetQuality > _lowQuality) {
+      compressedBytes = Uint8List.fromList(
+        img.encodeJpg(optimizedImage, quality: _lowQuality)
+      );
+    }
+    
+    return compressedBytes;
+  }
+  
+  /// Apply additional image optimizations
+  img.Image _applyImageOptimizations(img.Image image) {
+    // Apply slight sharpening to compensate for compression
+    var optimized = img.convolution(image, filter: [
+      0, -1, 0,
+      -1, 5, -1,
+      0, -1, 0
+    ], div: 1);
+    
+    // Ensure the image is in RGB format for better compression
+    optimized = img.copyResize(optimized, width: optimized.width, height: optimized.height);
+    
+    return optimized;
   }
 
   /// Get decrypted file bytes for display

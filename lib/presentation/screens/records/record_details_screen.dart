@@ -270,11 +270,13 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
                               context,
                               fieldLabel,
                               _isEditing
-                                  ? CustomTextField(
-                                      controller: controller,
-                                      labelText: fieldLabel,
-                                      obscureText: isSensitive && !_showSensitiveFields,
-                                    )
+                                  ? _isDateField(entry.key)
+                                      ? _buildDateField(context, entry.key, fieldLabel, controller)
+                                      : CustomTextField(
+                                          controller: controller,
+                                          labelText: fieldLabel,
+                                          obscureText: isSensitive && !_showSensitiveFields,
+                                        )
                                   : _buildDisplayField(
                                       context,
                                       controller.text,
@@ -1363,5 +1365,31 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
+  }
+
+  bool _isDateField(String fieldKey) {
+    return ['dateOfBirth', 'issueDate', 'expiryDate', 'purchaseDate', 'startDate'].contains(fieldKey);
+  }
+
+  Widget _buildDateField(BuildContext context, String fieldKey, String fieldLabel, TextEditingController controller) {
+    return CustomTextField(
+      controller: controller,
+      labelText: fieldLabel,
+      readOnly: true,
+      suffix: IconButton(
+        icon: const Icon(Icons.calendar_today),
+        onPressed: () async {
+          final date = await showDatePicker(
+            context: context,
+            initialDate: DateTime.now(),
+            firstDate: DateTime(1900),
+            lastDate: DateTime(2100),
+          );
+          if (date != null) {
+            controller.text = '${date.day}/${date.month}/${date.year}';
+          }
+        },
+      ),
+    );
   }
 }
