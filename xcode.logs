@@ -1,40 +1,6 @@
-AX Lookup problem - errorCode:1100 error:Permission denied portName:'com.apple.iphone.axserver' PID:9014 (
-	0   AXRuntime                           0x00000001cba260ac _AXGetPortFromCache + 796
-	1   AXRuntime                           0x00000001cba2ab70 AXUIElementPerformFencedActionWithValue + 700
-	2   UIKit                               0x000000024fedd45c 9D0F342D-DFF3-3A58-8E03-CF3DA4554925 + 1561692
-	3   libdispatch.dylib                   0x0000000101d28584 _dispatch_call_block_and_release + 32
-	4   libdispatch.dylib                   0x0000000101d42064 _dispatch_client_callout + 16
-	5   libdispatch.dylib                   0x0000000101d3091c _dispatch_lane_serial_drain + 796
-	6   libdispatch.dylib                   0x0000000101d315a4 _dispatch_lane_invoke + 432
-	7   libdispatch.dylib                   0x0000000101d3d894 _dispatch_root_queue_drain_deferred_wlh + 344
-	8   libdispatch.dylib                   0x0000000101d3ceb0 _dispatch_workloop_worker_thread + 580
-	9   libsystem_pthread.dylib             0x000000021e294a0c _pthread_wqthread + 292
-	10  libsystem_pthread.dylib             0x000000021e294aac start_wqthread + 8
-)
-AX Lookup problem - errorCode:1100 error:Permission denied portName:'com.apple.iphone.axserver' PID:9014 (
-	0   AXRuntime                           0x00000001cba260ac _AXGetPortFromCache + 796
-	1   AXRuntime                           0x00000001cba2ab70 AXUIElementPerformFencedActionWithValue + 700
-	2   UIKit                               0x000000024fedd45c 9D0F342D-DFF3-3A58-8E03-CF3DA4554925 + 1561692
-	3   libdispatch.dylib                   0x0000000101d28584 _dispatch_call_block_and_release + 32
-	4   libdispatch.dylib                   0x0000000101d42064 _dispatch_client_callout + 16
-	5   libdispatch.dylib                   0x0000000101d3091c _dispatch_lane_serial_drain + 796
-	6   libdispatch.dylib                   0x0000000101d315a4 _dispatch_lane_invoke + 432
-	7   libdispatch.dylib                   0x0000000101d3d894 _dispatch_root_queue_drain_deferred_wlh + 344
-	8   libdispatch.dylib                   0x0000000101d3ceb0 _dispatch_workloop_worker_thread + 580
-	9   libsystem_pthread.dylib             0x000000021e294a0c _pthread_wqthread + 292
-	10  libsystem_pthread.dylib             0x000000021e294aac start_wqthread + 8
-)
-AX Lookup problem - errorCode:1100 error:Permission denied portName:'com.apple.iphone.axserver' PID:9014 (
-	0   AXRuntime                           0x00000001cba260ac _AXGetPortFromCache + 796
-	1   AXRuntime                           0x00000001cba2ab70 AXUIElementPerformFencedActionWithValue + 700
-	2   UIKit                               0x000000024fedd45c 9D0F342D-DFF3-3A58-8E03-CF3DA4554925 + 1561692
-	3   libdispatch.dylib                   0x0000000101d28584 _dispatch_call_block_and_release + 32
-	4   libdispatch.dylib                   0x0000000101d42064 _dispatch_client_callout + 16
-	5   libdispatch.dylib                   0x0000000101d3091c _dispatch_lane_serial_drain + 796
-	6   libdispatch.dylib                   0x0000000101d315a4 _dispatch_lane_invoke + 432
-	7   libdispatch.dylib                   0x0000000101d3d894 _dispatch_root_queue_drain_deferred_wlh + 344
-	8   libdispatch.dylib                   0x0000000101d3ceb0 _dispatch_workloop_worker_thread + 580
-	9   libsystem_pthread.dylib             0x000000021e294a0c _pthread_wqthread + 292
-	10  libsystem_pthread.dylib             0x000000021e294aac start_wqthread + 8
-)
-FlutterSemanticsScrollView implements focusItemsInRect: - caching for linear focus movement is limited as long as this view is on screen.
+I keep getting this error when i update any record, even thruogh it does update,
+flutter: Encryption failed: RangeError (start): Invalid value: Only valid value is 0: -16
+flutter: IV length: 16
+flutter: Data length: 0
+flutter: Error encrypting record: Exception: Failed to encrypt data: RangeError (start): Invalid value: Only valid value is 0: -16
+flutter: Error updating record: Exception: Failed to encrypt record: Exception: Failed to encrypt data: RangeError (start): Invalid value: Only valid value is 0: -16

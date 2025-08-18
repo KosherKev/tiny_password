@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/providers.dart';
@@ -532,8 +533,27 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
               ),
             ),
           );
+        } else if (attachment.type == AttachmentType.pdf) {
+          // PDF preview
+          return Container(
+            height: 300,
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SfPdfViewer.file(
+                 file,
+               ),
+            ),
+          );
         } else {
-          // PDF preview placeholder
+          // Fallback for unknown attachment types
           return Container(
             height: 200,
             margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -549,13 +569,13 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.picture_as_pdf,
+                    Icons.insert_drive_file_outlined,
                     color: typeColor,
                     size: 48,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'PDF Document',
+                    'File Preview',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: typeColor,
                       fontWeight: FontWeight.w500,
@@ -563,7 +583,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Tap to view full document',
+                    'Tap to view',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
