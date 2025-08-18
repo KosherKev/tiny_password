@@ -1,5 +1,12 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
+import 'package:intl/intl.dart';
 import 'package:tiny_password/core/constants/app_constants.dart';
 import 'package:tiny_password/core/providers/providers.dart';
 
@@ -100,9 +107,69 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     try {
       if (!mounted) return;
       
+      // Show password confirmation dialog
+      final password = await _showPasswordConfirmationDialog();
+      if (password == null || password.isEmpty) return;
+      
+      // Verify master password
+      final authService = ref.read(authServiceProvider);
+      if (!await authService.verifyMasterPassword(password)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Invalid master password'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+        return;
+      }
+      
+      // Show loading dialog
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+      
+      // Export data
+      final repository = ref.read(repositoryProvider);
+      if (repository == null) {
+        throw Exception('Repository not available');
+      }
+      
+      final backupData = await repository.exportToBackup(password);
+      
+      // Create backup file
+      final timestamp = DateFormat('yyyy-MM-dd_HH-mm-ss').format(DateTime.now());
+      final fileName = 'tiny_password_backup_$timestamp.tpb';
+      
+      // Get temporary directory
+      final tempDir = await getTemporaryDirectory();
+      final backupFile = File(path.join(tempDir.path, fileName));
+      await backupFile.writeAsString(backupData);
+      
+      // Close loading dialog
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      
+      // Share the backup file
+      await Share.shareFiles(
+        [backupFile.path],
+        text: 'Tiny Password Backup - $timestamp',
+        subject: 'Password Manager Backup',
+      );
+      
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Export functionality coming soon'),
+          content: const Text('Backup exported successfully'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -111,6 +178,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         ),
       );
     } catch (e) {
+      // Close loading dialog if it's open
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -127,9 +199,77 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   Future<void> _importData() async {
     try {
+      if (!mounted) return;
+      
+      // Show warning dialog
+      final confirmed = await _showImportWarningDialog();
+      if (!confirmed) return;
+      
+      // Pick backup file
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['tpb'],
+        allowMultiple: false,
+      );
+      
+      if (result == null || result.files.isEmpty) return;
+      
+      final file = result.files.first;
+      if (file.path == null) {
+        throw Exception('Invalid file selected');
+      }
+      
+      // Show password confirmation dialog
+      final password = await _showPasswordConfirmationDialog();
+      if (password == null || password.isEmpty) return;
+      
+      // Verify master password
+      final authService = ref.read(authServiceProvider);
+      if (!await authService.verifyMasterPassword(password)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Invalid master password'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+        return;
+      }
+      
+      // Show loading dialog
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+      
+      // Read backup file
+      final backupFile = File(file.path!);
+      final backupData = await backupFile.readAsString();
+      
+      // Import data
+      final repository = ref.read(repositoryProvider);
+      if (repository == null) {
+        throw Exception('Repository not available');
+      }
+      
+      await repository.importFromBackup(backupData, password);
+      
+      // Close loading dialog
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Import functionality coming soon'),
+          content: const Text('Backup imported successfully'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -138,6 +278,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         ),
       );
     } catch (e) {
+      // Close loading dialog if it's open
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -150,6 +295,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         ),
       );
     }
+  }
+
+  Future<String?> _showPasswordConfirmationDialog() async {
+    return showDialog<String>(
+      context: context,
+      builder: (context) => const _PasswordConfirmationDialog(),
+    );
+  }
+
+  Future<bool> _showImportWarningDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Import Warning'),
+        content: const Text(
+          'Importing data will replace all existing passwords. This action cannot be undone. Are you sure you want to continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    ) ?? false;
   }
 
   @override
@@ -623,6 +800,117 @@ class _MasterPasswordDialogState extends ConsumerState<_MasterPasswordDialog> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('Verify'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PasswordConfirmationDialog extends ConsumerStatefulWidget {
+  const _PasswordConfirmationDialog();
+
+  @override
+  ConsumerState<_PasswordConfirmationDialog> createState() => _PasswordConfirmationDialogState();
+}
+
+class _PasswordConfirmationDialogState extends ConsumerState<_PasswordConfirmationDialog> {
+  final _passwordController = TextEditingController();
+  bool _obscureText = true;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outline,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.lock,
+                color: Theme.of(context).colorScheme.primary,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Confirm Master Password',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Please enter your master password to continue',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _passwordController,
+              obscureText: _obscureText,
+              decoration: InputDecoration(
+                labelText: 'Master Password',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureText ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscureText = !_obscureText;
+                    });
+                  },
+                ),
+              ),
+              onSubmitted: (_) {
+                Navigator.of(context).pop(_passwordController.text);
+              },
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(_passwordController.text);
+                    },
+                    child: const Text('Confirm'),
                   ),
                 ),
               ],
