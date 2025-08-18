@@ -369,8 +369,12 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
   }
 
   Widget _buildTypeSelector(BuildContext context, Color typeColor) {
+    final typeInfo = AppConstants.recordTypes[_selectedType.name];
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final selectedTypeColor = AppTheme.getRecordTypeColor(_selectedType.name, isDarkMode);
+    
     return Container(
-      width: double.infinity, // Add explicit width constraint
+      width: double.infinity,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -380,7 +384,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min, // Add this to prevent expansion issues
+        mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -394,87 +398,56 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: SizedBox(
-              width: double.infinity, // Ensure dropdown takes full width
-              child: DropdownButtonFormField<RecordType>(
-                value: _selectedType,
-                style: Theme.of(context).textTheme.bodyLarge,
-                dropdownColor: Theme.of(context).colorScheme.surface,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                isExpanded: true, // Add this to prevent overflow
-                items: RecordType.values.map((type) {
-                  final typeInfo = AppConstants.recordTypes[type.name];
-                  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-                  final color = AppTheme.getRecordTypeColor(type.name, isDarkMode);
-                  
-                  return DropdownMenuItem(
-                    value: type,
-                    child: IntrinsicHeight(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min, // Prevent Row from expanding
-                        crossAxisAlignment: CrossAxisAlignment.start, // Align items to top
+            child: GestureDetector(
+              onTap: () => _showEnhancedTypeDropdown(context),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: selectedTypeColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        _getIconForRecordType(_selectedType),
+                        color: selectedTypeColor,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              _getIconForRecordType(type),
-                              color: color,
-                              size: 18,
+                          Text(
+                            typeInfo?.name ?? _selectedType.displayName,
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          // Wrap the text column in Flexible instead of Expanded
-                          Flexible(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  typeInfo?.name ?? type.displayName,
-                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  overflow: TextOverflow.ellipsis, // Add overflow handling
-                                  maxLines: 1, // Limit to single line
-                                ),
-                                if (typeInfo?.description != null)
-                                  Flexible(
-                                    child: Text(
-                                      typeInfo!.description,
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                      ),
-                                      overflow: TextOverflow.ellipsis, // Add overflow handling
-                                      maxLines: 2, // Limit to 2 lines max
-                                      softWrap: true,
-                                    ),
-                                  ),
-                              ],
+                          if (typeInfo?.description != null)
+                            Text(
+                              typeInfo!.description,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
                         ],
                       ),
                     ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    // Defer setState to avoid layout conflicts
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) {
-                        setState(() => _selectedType = value);
-                      }
-                    });
-                  }
-                },
+                    Icon(
+                      Icons.arrow_drop_down,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -483,9 +456,25 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
     );
   }
 
+  void _showEnhancedTypeDropdown(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _EnhancedTypeDropdown(
+        selectedType: _selectedType,
+        onTypeSelected: (type) {
+          setState(() => _selectedType = type);
+          Navigator.of(context).pop();
+        },
+        getIconForRecordType: _getIconForRecordType,
+      ),
+    );
+  }
+
   Widget _buildCategorySelector(BuildContext context) {
     return Container(
-      width: double.infinity, // Add explicit width constraint
+      width: double.infinity,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -495,7 +484,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min, // Add this to prevent expansion issues
+        mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -509,54 +498,53 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: SizedBox(
-              width: double.infinity, // Ensure dropdown takes full width
-              child: DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                style: Theme.of(context).textTheme.bodyLarge,
-                dropdownColor: Theme.of(context).colorScheme.surface,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
-                isExpanded: true, // Add this to prevent overflow
-                items: AppConstants.defaultCategories.map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min, // Prevent Row from expanding
-                      children: [
-                        Icon(
-                          _getIconForCategory(category),
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          category,
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis, // Add overflow handling
-                        ),
-                      ],
+            child: GestureDetector(
+              onTap: () => _showEnhancedCategoryDropdown(context),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      _getIconForCategory(_selectedCategory),
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
                     ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    // Defer setState to avoid layout conflicts
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) {
-                        setState(() => _selectedCategory = value);
-                      }
-                    });
-                  }
-                },
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _selectedCategory,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showEnhancedCategoryDropdown(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _EnhancedCategoryDropdown(
+        selectedCategory: _selectedCategory,
+        onCategorySelected: (category) {
+          setState(() => _selectedCategory = category);
+          Navigator.of(context).pop();
+        },
+        getIconForCategory: _getIconForCategory,
       ),
     );
   }
@@ -826,5 +814,388 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       default:
         return [];
     }
+  }
+}
+
+class _EnhancedCategoryDropdown extends StatelessWidget {
+  final String selectedCategory;
+  final Function(String) onCategorySelected;
+  final IconData Function(String) getIconForCategory;
+
+  const _EnhancedCategoryDropdown({
+    required this.selectedCategory,
+    required this.onCategorySelected,
+    required this.getIconForCategory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Container(
+        color: Colors.black54,
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return GestureDetector(
+              onTap: () {}, // Prevent dismissal when tapping inside
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Handle bar and close button
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          // Handle bar
+                          Expanded(
+                            child: Center(
+                              child: Container(
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Close button
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: Icon(
+                              Icons.close,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Title
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Select Category',
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Category list
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: AppConstants.defaultCategories.length,
+                        itemBuilder: (context, index) {
+                          final category = AppConstants.defaultCategories[index];
+                          final isSelected = category == selectedCategory;
+                          
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: Material(
+                              color: isSelected
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withOpacity(0.1)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => onCategorySelected(category),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        getIconForCategory(category),
+                                        color: isSelected
+                                            ? Theme.of(context).colorScheme.primary
+                                            : Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.7),
+                                        size: 24,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Text(
+                                          category,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyLarge
+                                              ?.copyWith(
+                                                fontWeight: isSelected
+                                                    ? FontWeight.w600
+                                                    : FontWeight.w500,
+                                                color: isSelected
+                                                    ? Theme.of(context)
+                                                        .colorScheme
+                                                        .primary
+                                                    : null,
+                                              ),
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        Icon(
+                                          Icons.check_circle,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                          size: 20,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    // Bottom padding for safe area
+                    SizedBox(
+                      height: MediaQuery.of(context).padding.bottom + 16,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _EnhancedTypeDropdown extends StatelessWidget {
+  final RecordType selectedType;
+  final Function(RecordType) onTypeSelected;
+  final IconData Function(RecordType) getIconForRecordType;
+
+  const _EnhancedTypeDropdown({
+    required this.selectedType,
+    required this.onTypeSelected,
+    required this.getIconForRecordType,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Container(
+        color: Colors.black54,
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return GestureDetector(
+              onTap: () {}, // Prevent dismissal when tapping inside
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Handle bar and close button
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          // Handle bar
+                          Expanded(
+                            child: Center(
+                              child: Container(
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Close button
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: Icon(
+                              Icons.close,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Title
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Select Record Type',
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Record type list
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: RecordType.values.length,
+                        itemBuilder: (context, index) {
+                          final type = RecordType.values[index];
+                          final typeInfo = AppConstants.recordTypes[type.name];
+                          final isSelected = type == selectedType;
+                          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                          final typeColor = AppTheme.getRecordTypeColor(type.name, isDarkMode);
+                          
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: Material(
+                              color: isSelected
+                                  ? typeColor.withOpacity(0.1)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => onTypeSelected(type),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 16,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: typeColor.withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(
+                                          getIconForRecordType(type),
+                                          color: typeColor,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              typeInfo?.name ?? type.displayName,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyLarge
+                                                  ?.copyWith(
+                                                    fontWeight: isSelected
+                                                        ? FontWeight.w600
+                                                        : FontWeight.w500,
+                                                    color: isSelected
+                                                        ? typeColor
+                                                        : null,
+                                                  ),
+                                            ),
+                                            if (typeInfo?.description != null)
+                                              Text(
+                                                typeInfo!.description,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.copyWith(
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurfaceVariant,
+                                                    ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        Icon(
+                                          Icons.check_circle,
+                                          color: typeColor,
+                                          size: 20,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    // Bottom padding for safe area
+                    SizedBox(
+                      height: MediaQuery.of(context).padding.bottom + 16,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 }
