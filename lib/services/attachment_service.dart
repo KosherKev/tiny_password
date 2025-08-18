@@ -6,7 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:uuid/uuid.dart';
-import 'package:encrypt/encrypt.dart';
+// import 'package:encrypt/encrypt.dart';
 import 'package:image/image.dart' as img;
 import 'package:permission_handler/permission_handler.dart';
 
@@ -21,7 +21,7 @@ class AttachmentService {
   static const int _mediumQuality = 75; // Medium quality JPEG
   static const int _lowQuality = 60; // Low quality JPEG
   static const int _maxDimension = 1920; // Max width/height
-  static const int _thumbnailSize = 512; // Thumbnail size
+  // static const int _thumbnailSize = 512; // Thumbnail size
   
   final EncryptionService _encryptionService;
   final ImagePicker _imagePicker = ImagePicker();

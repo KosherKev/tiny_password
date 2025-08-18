@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'package:intl/intl.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
@@ -12,8 +11,6 @@ import '../../../domain/models/record.dart';
 import '../../../domain/models/attachment.dart';
 import '../../../services/attachment_service.dart';
 import '../../widgets/custom_text_field.dart';
-import '../../widgets/custom_button.dart';
-import 'add_edit_record_screen.dart';
 
 class RecordDetailsScreen extends ConsumerStatefulWidget {
   final String recordId;
@@ -912,88 +909,88 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
     );
   }
 
-  Widget _buildAttachmentItem(BuildContext context, Attachment attachment, Color typeColor) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
-        ),
-      ),
-      child: InkWell(
-        onTap: () => _viewAttachment(context, attachment),
-        borderRadius: BorderRadius.circular(8),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: typeColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                attachment.type == AttachmentType.image
-                    ? Icons.image_outlined
-                    : Icons.picture_as_pdf_outlined,
-                color: typeColor,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    attachment.fileName,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text(
-                        attachment.formattedFileSize,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '•',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatDate(attachment.createdAt),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.open_in_new,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              size: 16,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Widget _buildAttachmentItem(BuildContext context, Attachment attachment, Color typeColor) {
+  //   return Container(
+  //     margin: const EdgeInsets.only(bottom: 8),
+  //     padding: const EdgeInsets.all(12),
+  //     decoration: BoxDecoration(
+  //       color: Theme.of(context).colorScheme.surfaceVariant,
+  //       borderRadius: BorderRadius.circular(8),
+  //       border: Border.all(
+  //         color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+  //       ),
+  //     ),
+  //     child: InkWell(
+  //       onTap: () => _viewAttachment(context, attachment),
+  //       borderRadius: BorderRadius.circular(8),
+  //       child: Row(
+  //         children: [
+  //           Container(
+  //             width: 40,
+  //             height: 40,
+  //             decoration: BoxDecoration(
+  //               color: typeColor.withOpacity(0.1),
+  //               borderRadius: BorderRadius.circular(8),
+  //             ),
+  //             child: Icon(
+  //               attachment.type == AttachmentType.image
+  //                   ? Icons.image_outlined
+  //                   : Icons.picture_as_pdf_outlined,
+  //               color: typeColor,
+  //               size: 20,
+  //             ),
+  //           ),
+  //           const SizedBox(width: 12),
+  //           Expanded(
+  //             child: Column(
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 Text(
+  //                   attachment.fileName,
+  //                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+  //                     fontWeight: FontWeight.w500,
+  //                   ),
+  //                   maxLines: 1,
+  //                   overflow: TextOverflow.ellipsis,
+  //                 ),
+  //                 const SizedBox(height: 2),
+  //                 Row(
+  //                   children: [
+  //                     Text(
+  //                       attachment.formattedFileSize,
+  //                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
+  //                         color: Theme.of(context).colorScheme.onSurfaceVariant,
+  //                       ),
+  //                     ),
+  //                     const SizedBox(width: 8),
+  //                     Text(
+  //                       '•',
+  //                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
+  //                         color: Theme.of(context).colorScheme.onSurfaceVariant,
+  //                       ),
+  //                     ),
+  //                     const SizedBox(width: 8),
+  //                     Text(
+  //                       _formatDate(attachment.createdAt),
+  //                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
+  //                         color: Theme.of(context).colorScheme.onSurfaceVariant,
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ],
+  //             ),
+  //           ),
+  //           Icon(
+  //             Icons.open_in_new,
+  //             color: Theme.of(context).colorScheme.onSurfaceVariant,
+  //             size: 16,
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Future<void> _viewAttachment(BuildContext context, Attachment attachment) async {
     try {

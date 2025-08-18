@@ -19,7 +19,7 @@ class AutoLockService {
     
     if (!_isEnabled) return;
     
-    final duration = _ref.read(autoLockDurationProvider);
+    // final duration = _ref.read(autoLockDurationProvider);
     
     _autoLockTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _checkForAutoLock();

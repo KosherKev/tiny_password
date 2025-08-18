@@ -47,7 +47,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = ref.watch(isDarkModeProvider);
+    // final isDarkMode = ref.watch(isDarkModeProvider);
     final viewMode = ref.watch(viewModeProvider);
     final searchQuery = ref.watch(searchQueryProvider);
     final allRecords = ref.watch(allRecordsProvider);
