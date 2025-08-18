@@ -54,8 +54,31 @@ class _CategoryViewScreenState extends ConsumerState<CategoryViewScreen>
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              // Navigate to add record with pre-selected category
-              ref.read(navigationServiceProvider).navigateToAddRecord();
+              // Get the most common record type in this category as default
+              final allRecordsAsync = ref.read(allRecordsProvider);
+              RecordType? defaultType;
+              
+              allRecordsAsync.whenData((records) {
+                final filteredRecords = records
+                    .where((record) => record.category == widget.category)
+                    .toList();
+                
+                if (filteredRecords.isNotEmpty) {
+                  // Find the most common record type in this category
+                  final typeCount = <RecordType, int>{};
+                  for (final record in filteredRecords) {
+                    typeCount[record.type] = (typeCount[record.type] ?? 0) + 1;
+                  }
+                  
+                  // Get the type with the highest count
+                  defaultType = typeCount.entries
+                      .reduce((a, b) => a.value > b.value ? a : b)
+                      .key;
+                }
+              });
+              
+              // Navigate to add record with pre-selected type
+              ref.read(navigationServiceProvider).navigateToAddRecord(defaultType);
             },
           ),
         ],

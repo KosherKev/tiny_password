@@ -10,8 +10,9 @@ import '../../widgets/custom_button.dart';
 
 class AddEditRecordScreen extends ConsumerStatefulWidget {
   final String? recordId;
+  final RecordType? defaultType;
 
-  const AddEditRecordScreen({this.recordId, super.key});
+  const AddEditRecordScreen({this.recordId, this.defaultType, super.key});
 
   @override
   ConsumerState<AddEditRecordScreen> createState() => _AddEditRecordScreenState();
@@ -38,7 +39,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
   @override
   void initState() {
     super.initState();
-    _selectedType = RecordType.login;
+    _selectedType = widget.defaultType ?? RecordType.login;
     
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),

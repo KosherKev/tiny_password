@@ -54,8 +54,8 @@ class _RecordTypeViewScreenState extends ConsumerState<RecordTypeViewScreen>
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              // Navigate to add record with pre-selected type
-              ref.read(navigationServiceProvider).navigateToAddRecord();
+              // Navigate to add record with the current record type as default
+              ref.read(navigationServiceProvider).navigateToAddRecord(widget.recordType);
             },
           ),
         ],

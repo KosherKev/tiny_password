@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/models/record.dart';
 import '../../presentation/screens/auth/setup_master_password_screen.dart';
 import '../../presentation/screens/auth/unlock_screen.dart';
 
@@ -45,9 +46,9 @@ class NavigationService {
     );
   }
 
-  void navigateToAddRecord() {
+  void navigateToAddRecord([RecordType? defaultType]) {
     navigatorKey.currentState?.push(
-      MaterialPageRoute(builder: (_) => const AddEditRecordScreen()),
+      MaterialPageRoute(builder: (_) => AddEditRecordScreen(defaultType: defaultType)),
     );
   }
 
