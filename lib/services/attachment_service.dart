@@ -320,16 +320,23 @@ class AttachmentService {
     if (result == null || !context.mounted) return null;
 
     Attachment? attachment;
-    switch (result) {
-      case 'camera':
-        attachment = await pickImageFromCamera();
-        break;
-      case 'gallery':
-        attachment = await pickImageFromGallery();
-        break;
-      case 'pdf':
-        attachment = await pickPdfFile();
-        break;
+    try {
+      switch (result) {
+        case 'camera':
+          attachment = await pickImageFromCamera();
+          break;
+        case 'gallery':
+          attachment = await pickImageFromGallery();
+          break;
+        case 'pdf':
+          attachment = await pickPdfFile();
+          break;
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showErrorDialog(context, e.toString());
+      }
+      return null;
     }
 
     if (attachment != null && context.mounted) {
@@ -405,6 +412,23 @@ class AttachmentService {
               }
             },
             child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show error dialog to user
+  void _showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message.replaceFirst('Exception: ', '')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
           ),
         ],
       ),

@@ -660,6 +660,48 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
     );
   }
 
+  Future<void> _showAttachmentPicker(BuildContext context, Record record) async {
+    final authService = ref.read(authServiceProvider);
+    final attachmentService = AttachmentService(authService.encryptionService);
+    final attachment = await attachmentService.showAttachmentPicker(context);
+    if (attachment != null) {
+      setState(() {
+        record.attachments.add(attachment);
+      });
+      await _saveRecord();
+    }
+  }
+
+  Future<void> _removeAttachment(BuildContext context, Record record, int index) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Attachment'),
+        content: const Text('Are you sure you want to delete this attachment?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        record.attachments.removeAt(index);
+      });
+      await _saveRecord();
+    }
+  }
+
   void _showDeleteConfirmation() {
     showDialog(
       context: context,
@@ -752,6 +794,16 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                const Spacer(),
+                if (_isEditing)
+                  IconButton(
+                    onPressed: () => _showAttachmentPicker(context, record),
+                    icon: Icon(
+                      Icons.add_photo_alternate_outlined,
+                      color: typeColor,
+                    ),
+                    tooltip: 'Add Attachment',
+                  ),
               ],
             ),
             const SizedBox(height: 16),
@@ -767,6 +819,15 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+            if (_isEditing) ...[
+               const SizedBox(height: 4),
+               Text(
+                 'Tap + to add images or PDFs',
+                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                   color: Theme.of(context).colorScheme.onSurfaceVariant,
+                 ),
+               ),
+             ],
           ],
         ),
       );
@@ -801,6 +862,29 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
                 ),
               ),
               const Spacer(),
+              if (record.attachments.isNotEmpty && !_isEditing)
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _showSensitiveFields = !_showSensitiveFields;
+                    });
+                  },
+                  icon: Icon(
+                    _showSensitiveFields ? Icons.visibility_off : Icons.visibility,
+                    color: typeColor,
+                    size: 20,
+                  ),
+                  tooltip: _showSensitiveFields ? 'Hide Attachments' : 'Show Attachments',
+                ),
+              if (_isEditing)
+                IconButton(
+                  onPressed: () => _showAttachmentPicker(context, record),
+                  icon: Icon(
+                    Icons.add_photo_alternate_outlined,
+                    color: typeColor,
+                  ),
+                  tooltip: 'Add Attachment',
+                ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -818,7 +902,8 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
             ],
           ),
           const SizedBox(height: 16),
-          ...record.attachments.map((attachment) => _buildAttachmentPreview(context, attachment, typeColor)),
+          ...record.attachments.asMap().entries.map((entry) => 
+            _buildAttachmentPreview(context, entry.value, typeColor, entry.key, record)),
         ],
       ),
     );
@@ -999,7 +1084,7 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
     );
   }
 
-  Widget _buildAttachmentPreview(BuildContext context, Attachment attachment, Color typeColor) {
+  Widget _buildAttachmentPreview(BuildContext context, Attachment attachment, Color typeColor, [int? index, Record? record]) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -1044,15 +1129,26 @@ class _RecordDetailsScreenState extends ConsumerState<RecordDetailsScreen>
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: () => _viewAttachment(context, attachment),
-                icon: Icon(
-                  Icons.open_in_new,
-                  color: typeColor,
-                  size: 20,
+              if (_isEditing && index != null && record != null)
+                IconButton(
+                  onPressed: () => _removeAttachment(context, record, index),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: Theme.of(context).colorScheme.error,
+                    size: 20,
+                  ),
+                  tooltip: 'Delete attachment',
+                )
+              else
+                IconButton(
+                  onPressed: () => _viewAttachment(context, attachment),
+                  icon: Icon(
+                    Icons.open_in_new,
+                    color: typeColor,
+                    size: 20,
+                  ),
+                  tooltip: 'Open in full screen',
                 ),
-                tooltip: 'Open in full screen',
-              ),
             ],
           ),
           if (_showSensitiveFields) ...[

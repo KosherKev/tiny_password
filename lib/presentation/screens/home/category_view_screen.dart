@@ -274,8 +274,8 @@ class _CategoryViewScreenState extends ConsumerState<CategoryViewScreen>
         children: [
           SlidableAction(
             onPressed: (_) => _toggleFavorite(record.id),
-            backgroundColor: Theme.of(context).colorScheme.tertiary,
-            foregroundColor: Theme.of(context).colorScheme.onTertiary,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
             icon: record.isFavorite ? Icons.star : Icons.star_border,
             label: record.isFavorite ? 'Unfavorite' : 'Favorite',
             borderRadius: BorderRadius.circular(12),

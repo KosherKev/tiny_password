@@ -157,6 +157,13 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
   }
 
   Future<void> _saveRecord() async {
+    // Check for missing required fields first
+    final missingFields = _getMissingRequiredFields();
+    if (missingFields.isNotEmpty) {
+      _showMissingFieldsDialog(missingFields);
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -1127,6 +1134,61 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
 
   bool _isDateField(String fieldKey) {
     return ['dateOfBirth', 'issueDate', 'expiryDate', 'purchaseDate', 'startDate'].contains(fieldKey);
+  }
+
+  List<String> _getMissingRequiredFields() {
+    final missingFields = <String>[];
+    final relevantFields = _getFieldsForType(_selectedType);
+    
+    // Check title field
+    if (_titleController.text.trim().isEmpty) {
+      missingFields.add('Title');
+    }
+    
+    // Check required fields for the selected type
+    for (final fieldKey in relevantFields.keys) {
+      if (_isRequiredField(fieldKey, _selectedType)) {
+        final controller = _fieldControllers[fieldKey];
+        if (controller == null || controller.text.trim().isEmpty) {
+          missingFields.add(relevantFields[fieldKey]!);
+        }
+      }
+    }
+    
+    return missingFields;
+  }
+
+  void _showMissingFieldsDialog(List<String> missingFields) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Missing Required Fields'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Please fill in the following required fields:'),
+            const SizedBox(height: 12),
+            ...missingFields.map((field) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, size: 16, color: Colors.red),
+                  const SizedBox(width: 8),
+                  Text(field, style: const TextStyle(fontWeight: FontWeight.w500)),
+                ],
+              ),
+            )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   TextInputType _getKeyboardType(String fieldKey) {
