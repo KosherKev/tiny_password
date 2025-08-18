@@ -1,6 +1,6 @@
 {
-    "name": "tiny_password",
-    "short_name": "tiny_password",
+    "name": "Guardian",
+    "short_name": "Guardian",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

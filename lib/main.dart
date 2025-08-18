@@ -43,7 +43,7 @@ class TinyPasswordApp extends ConsumerWidget {
         FocusManager.instance.primaryFocus?.unfocus();
       },
       child: MaterialApp(
-        title: 'Tiny Password',
+        title: 'Guardian',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,

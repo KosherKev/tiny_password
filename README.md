@@ -1,4 +1,4 @@
-# Tiny Password Manager
+# Guardian Password Manager
 
 A secure, user-friendly password manager built with Flutter that helps you store and manage your sensitive information safely.
 
@@ -39,7 +39,7 @@ lib/
 
 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/tiny_password.git
+git clone https://github.com/yourusername/guardian.git
 ```
 
 2. Install dependencies

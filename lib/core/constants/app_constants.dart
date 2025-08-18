@@ -1,6 +1,6 @@
 class AppConstants {
   // App Information
-  static const String appName = 'Tiny Password';
+  static const String appName = 'Guardian';
   static const String appVersion = '1.0.0';
 
   // Encryption
@@ -320,7 +320,7 @@ class AppConstants {
 
   // Grid Layout Constants
   static const int gridCrossAxisCount = 2;
-  static const double gridChildAspectRatio = 1.2;
+  static const double gridChildAspectRatio = 1.25; // Increased to prevent overflow
   static const double gridSpacing = 16.0;
 
   // Animation Durations

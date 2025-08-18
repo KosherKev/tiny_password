@@ -102,7 +102,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
               
               // App title with clean typography
               Text(
-                'Tiny Password',
+                'Guardian',
                 style: Theme.of(context).textTheme.displayMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),

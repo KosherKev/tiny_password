@@ -598,12 +598,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16), // Reduced from 20 to 16
                 child: Row(
                   children: [
                     Container(
-                      width: 48,
-                      height: 48,
+                      width: 44, // Reduced from 48 to 44
+                      height: 44, // Reduced from 48 to 44
                       decoration: BoxDecoration(
                         color: color.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -611,7 +611,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       child: Icon(
                         icon,
                         color: color,
-                        size: 24,
+                        size: 22, // Reduced from 24 to 22
                       ),
                     ),
                     const Spacer(),
@@ -632,27 +632,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+              Expanded( // Use Expanded to prevent overflow
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), // Reduced padding
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min, // Minimize space usage
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$count items',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      const SizedBox(height: 2), // Reduced from 4 to 2
+                      Text(
+                        '$count items',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],

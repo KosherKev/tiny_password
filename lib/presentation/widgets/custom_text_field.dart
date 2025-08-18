@@ -262,9 +262,12 @@ class _CustomTextFieldState extends State<CustomTextField>
       return actions.first;
     }
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: actions,
+    return SizedBox(
+      width: actions.length * 48.0, // 48dp per action button
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: actions,
+      ),
     );
   }
 }

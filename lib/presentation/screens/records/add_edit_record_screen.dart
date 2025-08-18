@@ -61,9 +61,13 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       curve: Curves.easeOut,
     ));
 
-    _animationController.forward();
     _initializeFieldControllers();
-    _loadRecord();
+    
+    // Start animation and load record after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _animationController.forward();
+      _loadRecord();
+    });
   }
 
   @override
@@ -116,20 +120,22 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       final record = await ref.read(selectedRecordProvider(widget.recordId!).future);
       if (record == null) return;
 
-      setState(() {
-        _selectedType = record.type;
-        _titleController.text = record.title;
-        _notesController.text = record.notes ?? '';
-        _selectedCategory = record.category ?? 'Personal';
-        _isFavorite = record.isFavorite;
+      if (mounted) {
+        setState(() {
+          _selectedType = record.type;
+          _titleController.text = record.title;
+          _notesController.text = record.notes ?? '';
+          _selectedCategory = record.category ?? 'Personal';
+          _isFavorite = record.isFavorite;
 
-        // Populate field controllers
-        for (final entry in record.fields.entries) {
-          if (_fieldControllers.containsKey(entry.key)) {
-            _fieldControllers[entry.key]!.text = entry.value;
+          // Populate field controllers
+          for (final entry in record.fields.entries) {
+            if (_fieldControllers.containsKey(entry.key)) {
+              _fieldControllers[entry.key]!.text = entry.value;
+            }
           }
-        }
-      });
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -262,72 +268,108 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
           ),
         ],
       ),
-      body: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return Opacity(
-            opacity: _fadeAnimation.value,
-            child: Transform.translate(
-              offset: Offset(0, _slideAnimation.value),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Record Type Selector
-                            _buildTypeSelector(context, typeColor),
-                            const SizedBox(height: 24),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SafeArea(
+            child: AnimatedBuilder(
+              animation: _animationController,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: _fadeAnimation.value,
+                  child: Transform.translate(
+                    offset: Offset(0, _slideAnimation.value),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(24),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: constraints.maxHeight - 120, // Account for button area
+                              ),
+                              child: IntrinsicHeight(
+                                child: Form(
+                                  key: _formKey,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Record Type Selector
+                                      _buildTypeSelector(context, typeColor),
+                                      const SizedBox(height: 24),
 
-                            // Title Field
-                            CustomTextField(
-                              controller: _titleController,
-                              labelText: 'Title',
-                              validator: (value) =>
-                                  value?.isEmpty == true ? 'Please enter a title' : null,
+                                      // Title Field
+                                      CustomTextField(
+                                        controller: _titleController,
+                                        labelText: 'Title',
+                                        validator: (value) =>
+                                            value?.isEmpty == true ? 'Please enter a title' : null,
+                                      ),
+
+                                      const SizedBox(height: 16),
+
+                                      // Category Selector
+                                      _buildCategorySelector(context),
+
+                                      const SizedBox(height: 24),
+
+                                      // Dynamic Fields
+                                      ..._buildTypeSpecificFields(context, typeColor),
+
+                                      const SizedBox(height: 24),
+
+                                      // Notes Field
+                                      CustomTextField(
+                                        controller: _notesController,
+                                        labelText: 'Notes (Optional)',
+                                        maxLines: 4,
+                                      ),
+
+                                      const SizedBox(height: 140), // Increased space for bottom button
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
-
-                            const SizedBox(height: 16),
-
-                            // Category Selector
-                            _buildCategorySelector(context),
-
-                            const SizedBox(height: 24),
-
-                            // Dynamic Fields
-                            ..._buildTypeSpecificFields(context, typeColor),
-
-                            const SizedBox(height: 24),
-
-                            // Notes Field
-                            CustomTextField(
-                              controller: _notesController,
-                              labelText: 'Notes (Optional)',
-                              maxLines: 4,
-                            ),
-
-                            const SizedBox(height: 100), // Space for FAB
-                          ],
+                          ),
                         ),
-                      ),
+                        // Bottom button area - fixed position with safe area
+                        SafeArea(
+                          top: false,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface,
+                              border: Border(
+                                top: BorderSide(
+                                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                                ),
+                              ),
+                            ),
+                            child: CustomButton(
+                              text: widget.recordId == null ? 'Create Record' : 'Update Record',
+                              onPressed: _isLoading ? null : _saveRecord,
+                              isLoading: _isLoading,
+                              width: double.infinity,
+                              icon: widget.recordId == null ? Icons.add : Icons.save,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           );
         },
       ),
-      floatingActionButton: _buildSaveButton(context),
     );
   }
 
   Widget _buildTypeSelector(BuildContext context, Color typeColor) {
     return Container(
+      width: double.infinity, // Add explicit width constraint
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -337,6 +379,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min, // Add this to prevent expansion issues
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -350,67 +393,88 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: DropdownButtonFormField<RecordType>(
-              value: _selectedType,
-              style: Theme.of(context).textTheme.bodyLarge,
-              dropdownColor: Theme.of(context).colorScheme.surface,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-              ),
-              items: RecordType.values.map((type) {
-                final typeInfo = AppConstants.recordTypes[type.name];
-                final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-                final color = AppTheme.getRecordTypeColor(type.name, isDarkMode);
-                
-                return DropdownMenuItem(
-                  value: type,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _getIconForRecordType(type),
-                          color: color,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              typeInfo?.name ?? type.displayName,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
+            child: SizedBox(
+              width: double.infinity, // Ensure dropdown takes full width
+              child: DropdownButtonFormField<RecordType>(
+                value: _selectedType,
+                style: Theme.of(context).textTheme.bodyLarge,
+                dropdownColor: Theme.of(context).colorScheme.surface,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                isExpanded: true, // Add this to prevent overflow
+                items: RecordType.values.map((type) {
+                  final typeInfo = AppConstants.recordTypes[type.name];
+                  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                  final color = AppTheme.getRecordTypeColor(type.name, isDarkMode);
+                  
+                  return DropdownMenuItem(
+                    value: type,
+                    child: IntrinsicHeight(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min, // Prevent Row from expanding
+                        crossAxisAlignment: CrossAxisAlignment.start, // Align items to top
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: color.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            if (typeInfo?.description != null)
-                              Text(
-                                typeInfo!.description,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            child: Icon(
+                              _getIconForRecordType(type),
+                              color: color,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Wrap the text column in Flexible instead of Expanded
+                          Flexible(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  typeInfo?.name ?? type.displayName,
+                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis, // Add overflow handling
+                                  maxLines: 1, // Limit to single line
                                 ),
-                              ),
-                          ],
-                        ),
+                                if (typeInfo?.description != null)
+                                  Flexible(
+                                    child: Text(
+                                      typeInfo!.description,
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                      overflow: TextOverflow.ellipsis, // Add overflow handling
+                                      maxLines: 2, // Limit to 2 lines max
+                                      softWrap: true,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedType = value);
-                }
-              },
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    // Defer setState to avoid layout conflicts
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() => _selectedType = value);
+                      }
+                    });
+                  }
+                },
+              ),
             ),
           ),
         ],
@@ -420,6 +484,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
 
   Widget _buildCategorySelector(BuildContext context) {
     return Container(
+      width: double.infinity, // Add explicit width constraint
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -429,6 +494,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min, // Add this to prevent expansion issues
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -442,40 +508,51 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: DropdownButtonFormField<String>(
-              value: _selectedCategory,
-              style: Theme.of(context).textTheme.bodyLarge,
-              dropdownColor: Theme.of(context).colorScheme.surface,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-              ),
-              items: AppConstants.defaultCategories.map((category) {
-                return DropdownMenuItem(
-                  value: category,
-                  child: Row(
-                    children: [
-                      Icon(
-                        _getIconForCategory(category),
-                        color: Theme.of(context).colorScheme.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        category,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w500,
+            child: SizedBox(
+              width: double.infinity, // Ensure dropdown takes full width
+              child: DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                style: Theme.of(context).textTheme.bodyLarge,
+                dropdownColor: Theme.of(context).colorScheme.surface,
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                isExpanded: true, // Add this to prevent overflow
+                items: AppConstants.defaultCategories.map((category) {
+                  return DropdownMenuItem(
+                    value: category,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min, // Prevent Row from expanding
+                      children: [
+                        Icon(
+                          _getIconForCategory(category),
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedCategory = value);
-                }
-              },
+                        const SizedBox(width: 12),
+                        Text(
+                          category,
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis, // Add overflow handling
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    // Defer setState to avoid layout conflicts
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() => _selectedCategory = value);
+                      }
+                    });
+                  }
+                },
+              ),
             ),
           ),
         ],
@@ -559,6 +636,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
     final options = _getDropdownOptions(fieldKey);
 
     return Container(
+      width: double.infinity, // Add explicit width constraint
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceVariant,
         borderRadius: BorderRadius.circular(8),
@@ -574,10 +652,14 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         dropdownColor: Theme.of(context).colorScheme.surface,
+        isExpanded: true, // Add this to prevent overflow
         items: options.map((option) {
           return DropdownMenuItem(
             value: option,
-            child: Text(option),
+            child: Text(
+              option,
+              overflow: TextOverflow.ellipsis, // Add overflow handling
+            ),
           );
         }).toList(),
         onChanged: (value) {
@@ -607,19 +689,6 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
             controller.text = '${date.day}/${date.month}/${date.year}';
           }
         },
-      ),
-    );
-  }
-
-  Widget _buildSaveButton(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      child: CustomButton(
-        text: widget.recordId == null ? 'Create Record' : 'Update Record',
-        onPressed: _isLoading ? null : _saveRecord,
-        isLoading: _isLoading,
-        width: double.infinity,
-        icon: widget.recordId == null ? Icons.add : Icons.save,
       ),
     );
   }
