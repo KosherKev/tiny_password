@@ -19,7 +19,7 @@ class _PasswordStrengthIndicatorState extends State<PasswordStrengthIndicator>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
     _progressAnimation = Tween<double>(
@@ -66,19 +66,45 @@ class _PasswordStrengthIndicatorState extends State<PasswordStrengthIndicator>
   }
 
   (Color, String, IconData) _getStrengthProperties(int strength) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     switch (strength) {
       case 0:
-        return (const Color(0xFFef4444), 'Too Short', Icons.error_outline);
+        return (
+          isDarkMode ? const Color(0xFFF87171) : const Color(0xFFEF4444),
+          'Too Short',
+          Icons.error_outline
+        );
       case 1:
-        return (const Color(0xFFf97316), 'Weak', Icons.warning_amber);
+        return (
+          isDarkMode ? const Color(0xFFFB923C) : const Color(0xFFF97316),
+          'Weak',
+          Icons.warning_amber
+        );
       case 2:
-        return (const Color(0xFFf59e0b), 'Fair', Icons.info_outline);
+        return (
+          isDarkMode ? const Color(0xFFFBBF24) : const Color(0xFFF59E0B),
+          'Fair',
+          Icons.info_outline
+        );
       case 3:
-        return (const Color(0xFF84cc16), 'Good', Icons.check_circle_outline);
+        return (
+          isDarkMode ? const Color(0xFFA3E635) : const Color(0xFF84CC16),
+          'Good',
+          Icons.check_circle_outline
+        );
       case 4:
-        return (const Color(0xFF22c55e), 'Strong', Icons.verified);
+        return (
+          isDarkMode ? const Color(0xFF4ADE80) : const Color(0xFF22C55E),
+          'Strong',
+          Icons.verified
+        );
       default:
-        return (Colors.grey, 'Invalid', Icons.help_outline);
+        return (
+          Theme.of(context).colorScheme.onSurfaceVariant,
+          'Invalid',
+          Icons.help_outline
+        );
     }
   }
 
@@ -94,15 +120,10 @@ class _PasswordStrengthIndicatorState extends State<PasswordStrengthIndicator>
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              colors: [
-                Colors.white.withOpacity(0.05),
-                Colors.white.withOpacity(0.02),
-              ],
-            ),
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Colors.white.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.outline,
             ),
           ),
           child: Column(
@@ -119,83 +140,65 @@ class _PasswordStrengthIndicatorState extends State<PasswordStrengthIndicator>
                   const SizedBox(width: 8),
                   Text(
                     'Password Strength: ',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 14,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   Text(
                     label,
-                    style: TextStyle(
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: color,
-                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const Spacer(),
-                  Text(
-                    '${(progress * 100).round()}%',
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${(progress * 100).round()}%',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
-              // Progress bar with marble effect
+              // Progress bar with clean geometric design
               Container(
                 height: 8,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(4),
-                  color: Colors.grey[800],
+                  color: Theme.of(context).colorScheme.surfaceVariant,
                 ),
-                child: Stack(
-                  children: [
-                    // Background pattern
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.grey[800]!,
-                            Colors.grey[700]!,
-                          ],
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: progress * _progressAnimation.value,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      color: color,
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withOpacity(0.3),
+                          blurRadius: 4,
                         ),
-                      ),
+                      ],
                     ),
-                    // Progress fill
-                    FractionallySizedBox(
-                      widthFactor: progress * _progressAnimation.value,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
-                          gradient: LinearGradient(
-                            colors: [
-                              color,
-                              color.withOpacity(0.8),
-                            ],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: color.withOpacity(0.4),
-                              blurRadius: 4,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
 
               if (widget.password.isNotEmpty) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 ..._buildRequirements(),
               ],
             ],
@@ -238,73 +241,53 @@ class _PasswordStrengthIndicatorState extends State<PasswordStrengthIndicator>
   }
 
   Widget _buildRequirement(String text, bool isMet, IconData iconData) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final successColor = isDarkMode ? const Color(0xFF4ADE80) : const Color(0xFF22C55E);
+    
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
           AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 200),
             width: 20,
             height: 20,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: isMet
-                  ? const LinearGradient(
-                      colors: [
-                        Color(0xFF22c55e),
-                        Color(0xFF16a34a),
-                      ],
-                    )
-                  : LinearGradient(
-                      colors: [
-                        Colors.grey[600]!,
-                        Colors.grey[700]!,
-                      ],
+              color: isMet
+                  ? successColor
+                  : Theme.of(context).colorScheme.surfaceVariant,
+              border: isMet
+                  ? null
+                  : Border.all(
+                      color: Theme.of(context).colorScheme.outline,
                     ),
-              boxShadow: isMet
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF22c55e).withOpacity(0.3),
-                        blurRadius: 4,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
             ),
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 150),
               child: Icon(
                 isMet ? Icons.check : iconData,
                 key: ValueKey(isMet),
                 size: 12,
-                color: Colors.white,
+                color: isMet
+                    ? Colors.white
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 300),
-              style: TextStyle(
-                fontSize: 14,
+              duration: const Duration(milliseconds: 200),
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                 color: isMet 
-                    ? const Color(0xFF22c55e)
-                    : Colors.grey[400],
+                    ? successColor
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
                 fontWeight: isMet ? FontWeight.w500 : FontWeight.normal,
               ),
               child: Text(text),
             ),
           ),
-          if (isMet)
-            AnimatedScale(
-              scale: 1.0,
-              duration: const Duration(milliseconds: 300),
-              child: Icon(
-                Icons.check_circle,
-                size: 16,
-                color: const Color(0xFF22c55e),
-              ),
-            ),
         ],
       ),
     );

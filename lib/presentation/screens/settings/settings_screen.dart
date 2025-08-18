@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tiny_password/core/constants/app_constants.dart';
 import 'package:tiny_password/core/providers/providers.dart';
-import 'dart:math' as math;
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -14,21 +13,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen>
     with TickerProviderStateMixin {
   late AnimationController _animationController;
-  late AnimationController _particleController;
   late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    
-    _particleController = AnimationController(
-      duration: const Duration(seconds: 4),
-      vsync: this,
-    )..repeat();
 
     _fadeAnimation = Tween<double>(
       begin: 0.0,
@@ -44,7 +37,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   @override
   void dispose() {
     _animationController.dispose();
-    _particleController.dispose();
     super.dispose();
   }
 
@@ -63,10 +55,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           scaffoldMessenger.showSnackBar(
             SnackBar(
               content: const Text('Biometric authentication is not available'),
-              backgroundColor: const Color(0xFFef4444),
+              backgroundColor: Theme.of(context).colorScheme.error,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           );
@@ -89,10 +81,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(e.toString()),
-          backgroundColor: const Color(0xFFef4444),
+          backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
       );
@@ -106,18 +98,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   Future<void> _exportData() async {
     try {
-      // final repository = ref.read(safeRepositoryProvider);
-      // final exportedData = await repository.exportToBackup('backup_password');
-
       if (!mounted) return;
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Export functionality coming soon'),
-          backgroundColor: const Color(0xFF3b82f6),
+          backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
       );
@@ -126,10 +115,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Export failed: $e'),
-          backgroundColor: const Color(0xFFef4444),
+          backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
       );
@@ -141,10 +130,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Import functionality coming soon'),
-          backgroundColor: const Color(0xFF3b82f6),
+          backgroundColor: Theme.of(context).colorScheme.primary,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
       );
@@ -153,10 +142,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Import failed: $e'),
-          backgroundColor: const Color(0xFFef4444),
+          backgroundColor: Theme.of(context).colorScheme.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
       );
@@ -170,412 +159,342 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final isBiometricsEnabled = ref.watch(isBiometricsEnabledProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0f0f0f),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1a1a1a),
-              Color(0xFF0f0f0f),
-              Color(0xFF2d2d2d),
-            ],
-          ),
-        ),
-        child: Stack(
-          children: [
-            // Marble texture overlay
-            Container(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: const AssetImage('assets/images/marble_texture.png'),
-                  fit: BoxFit.cover,
-                  opacity: 0.05,
-                  colorFilter: ColorFilter.mode(
-                    Colors.white.withOpacity(0.02),
-                    BlendMode.overlay,
+      backgroundColor: Theme.of(context).colorScheme.background,
+      appBar: AppBar(
+        title: const Text('Settings'),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        centerTitle: true,
+      ),
+      body: AnimatedBuilder(
+        animation: _fadeAnimation,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _fadeAnimation.value,
+            child: Transform.translate(
+              offset: Offset(0, 20 * (1 - _fadeAnimation.value)),
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  // Appearance Section
+                  _buildSectionHeader(context, 'Appearance', Icons.palette),
+                  const SizedBox(height: 16),
+                  _buildSettingCard(
+                    context,
+                    child: SwitchListTile(
+                      title: Text(
+                        'Dark Mode',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Switch between light and dark themes',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      value: isDarkMode,
+                      onChanged: (value) {
+                        ref.read(isDarkModeProvider.notifier).state = value;
+                      },
+                      activeColor: Theme.of(context).colorScheme.primary,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
+
+                  const SizedBox(height: 32),
+
+                  // Security Section
+                  _buildSectionHeader(context, 'Security', Icons.security),
+                  const SizedBox(height: 16),
+                  
+                  _buildSettingCard(
+                    context,
+                    child: ListTile(
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.password,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        'Change Master Password',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Update your master password',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      onTap: _changeMasterPassword,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _buildSettingCard(
+                    context,
+                    child: SwitchListTile(
+                      secondary: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.fingerprint,
+                          color: Theme.of(context).colorScheme.secondary,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        'Biometric Authentication',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Use fingerprint or face ID to unlock',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      value: isBiometricsEnabled.value ?? false,
+                      onChanged: (_) => _toggleBiometrics(),
+                      activeColor: Theme.of(context).colorScheme.primary,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _buildSettingCard(
+                    context,
+                    child: ListTile(
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.tertiary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.timer,
+                          color: Theme.of(context).colorScheme.tertiary,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        'Auto-Lock Timer',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Lock after ${autoLockDuration.inMinutes} minutes of inactivity',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => _AutoLockDialog(
+                            initialDuration: autoLockDuration,
+                          ),
+                        );
+                      },
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Data Management Section
+                  _buildSectionHeader(context, 'Data Management', Icons.storage),
+                  const SizedBox(height: 16),
+
+                  _buildSettingCard(
+                    context,
+                    child: ListTile(
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.upload,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        'Export Data',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Create an encrypted backup of your data',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      onTap: _exportData,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _buildSettingCard(
+                    context,
+                    child: ListTile(
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.download,
+                          color: Theme.of(context).colorScheme.secondary,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        'Import Data',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Restore data from a backup file',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      onTap: _importData,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // About Section
+                  _buildSectionHeader(context, 'About', Icons.info),
+                  const SizedBox(height: 16),
+
+                  _buildSettingCard(
+                    context,
+                    child: ListTile(
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.info_outline,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        'Version',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        AppConstants.appVersion,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
-
-            // Floating particles
-            AnimatedBuilder(
-              animation: _particleController,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: SettingsParticlePainter(_particleController.value),
-                  size: Size.infinite,
-                );
-              },
-            ),
-
-            // Main content
-            AnimatedBuilder(
-              animation: _fadeAnimation,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeAnimation.value,
-                  child: CustomScrollView(
-                    slivers: [
-                      // Modern App Bar
-                      SliverAppBar(
-                        expandedHeight: 120,
-                        floating: false,
-                        pinned: true,
-                        backgroundColor: Colors.transparent,
-                        leading: IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        flexibleSpace: FlexibleSpaceBar(
-                          titlePadding: const EdgeInsets.only(left: 60, bottom: 16),
-                          title: Row(
-                            children: [
-                              Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFFfbbf24),
-                                      Color(0xFFf59e0b),
-                                    ],
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.settings,
-                                  color: Colors.white,
-                                  size: 18,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Settings',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Content
-                      SliverPadding(
-                        padding: const EdgeInsets.all(24),
-                        sliver: SliverList(
-                          delegate: SliverChildListDelegate([
-                            // Appearance Section
-                            _buildSectionHeader('Appearance', Icons.palette),
-                            const SizedBox(height: 16),
-                            _buildSettingCard(
-                              child: SwitchListTile(
-                                title: const Text(
-                                  'Dark Mode',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  'Switch between light and dark themes',
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                value: isDarkMode,
-                                onChanged: (value) {
-                                  ref.read(isDarkModeProvider.notifier).state = value;
-                                },
-                                activeColor: const Color(0xFFfbbf24),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-
-                            const SizedBox(height: 32),
-
-                            // Security Section
-                            _buildSectionHeader('Security', Icons.security),
-                            const SizedBox(height: 16),
-                            
-                            _buildSettingCard(
-                              child: ListTile(
-                                leading: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFFef4444), Color(0xFFdc2626)],
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.password, color: Colors.white, size: 20),
-                                ),
-                                title: const Text(
-                                  'Change Master Password',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  'Update your master password',
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                                onTap: _changeMasterPassword,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            _buildSettingCard(
-                              child: SwitchListTile(
-                                secondary: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFF3b82f6), Color(0xFF2563eb)],
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.fingerprint, color: Colors.white, size: 20),
-                                ),
-                                title: const Text(
-                                  'Biometric Authentication',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  'Use fingerprint or face ID to unlock',
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                value: isBiometricsEnabled.value ?? false,
-                                onChanged: (_) => _toggleBiometrics(),
-                                activeColor: const Color(0xFFfbbf24),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            _buildSettingCard(
-                              child: ListTile(
-                                leading: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFF8b5cf6), Color(0xFF7c3aed)],
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.timer, color: Colors.white, size: 20),
-                                ),
-                                title: const Text(
-                                  'Auto-Lock Timer',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  'Lock after ${autoLockDuration.inMinutes} minutes of inactivity',
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => _AutoLockDialog(
-                                      initialDuration: autoLockDuration,
-                                    ),
-                                  );
-                                },
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-
-                            const SizedBox(height: 32),
-
-                            // Data Management Section
-                            _buildSectionHeader('Data Management', Icons.storage),
-                            const SizedBox(height: 16),
-
-                            _buildSettingCard(
-                              child: ListTile(
-                                leading: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFF22c55e), Color(0xFF16a34a)],
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.upload, color: Colors.white, size: 20),
-                                ),
-                                title: const Text(
-                                  'Export Data',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  'Create an encrypted backup of your data',
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                                onTap: _exportData,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-
-                            const SizedBox(height: 16),
-
-                            _buildSettingCard(
-                              child: ListTile(
-                                leading: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFFf59e0b), Color(0xFFd97706)],
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.download, color: Colors.white, size: 20),
-                                ),
-                                title: const Text(
-                                  'Import Data',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  'Restore data from a backup file',
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                                onTap: _importData,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-
-                            const SizedBox(height: 32),
-
-                            // About Section
-                            _buildSectionHeader('About', Icons.info),
-                            const SizedBox(height: 16),
-
-                            _buildSettingCard(
-                              child: ListTile(
-                                leading: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFF6b7280), Color(0xFF4b5563)],
-                                    ),
-                                  ),
-                                  child: const Icon(Icons.info_outline, color: Colors.white, size: 20),
-                                ),
-                                title: const Text(
-                                  'Version',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  AppConstants.appVersion,
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-
-                            const SizedBox(height: 100),
-                          ]),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
+  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: const Color(0xFFfbbf24),
-          size: 24,
+        Container(
+          width: 4,
+          height: 24,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
         const SizedBox(width: 12),
+        Icon(
+          icon,
+          color: Theme.of(context).colorScheme.primary,
+          size: 20,
+        ),
+        const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(
-            color: Color(0xFFfbbf24),
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSettingCard({required Widget child}) {
+  Widget _buildSettingCard(BuildContext context, {required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.08),
-            Colors.white.withOpacity(0.04),
-          ],
-        ),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Theme.of(context).colorScheme.outline,
         ),
       ),
       child: child,
@@ -593,6 +512,7 @@ class _MasterPasswordDialog extends ConsumerStatefulWidget {
 class _MasterPasswordDialogState extends ConsumerState<_MasterPasswordDialog> {
   final _passwordController = TextEditingController();
   String? _errorText;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -607,6 +527,8 @@ class _MasterPasswordDialogState extends ConsumerState<_MasterPasswordDialog> {
       return;
     }
 
+    setState(() => _isLoading = true);
+
     try {
       final authService = ref.read(authServiceProvider);
       final isValid = await authService.verifyMasterPassword(password);
@@ -619,17 +541,19 @@ class _MasterPasswordDialogState extends ConsumerState<_MasterPasswordDialog> {
       }
     } catch (e) {
       setState(() => _errorText = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: const Color(0xFF1a1a1a),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: Colors.white.withOpacity(0.1),
+          color: Theme.of(context).colorScheme.outline,
         ),
       ),
       child: Padding(
@@ -637,26 +561,31 @@ class _MasterPasswordDialogState extends ConsumerState<_MasterPasswordDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.fingerprint,
-              color: Color(0xFFfbbf24),
-              size: 48,
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.fingerprint,
+                color: Theme.of(context).colorScheme.primary,
+                size: 32,
+              ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Verify Master Password',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 12),
             Text(
               'Please enter your master password to enable biometric authentication',
-              style: TextStyle(
-                color: Colors.grey[300],
-                fontSize: 14,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -664,22 +593,12 @@ class _MasterPasswordDialogState extends ConsumerState<_MasterPasswordDialog> {
             TextField(
               controller: _passwordController,
               obscureText: true,
-              style: const TextStyle(color: Colors.white),
+              enabled: !_isLoading,
               decoration: InputDecoration(
                 labelText: 'Master Password',
-                labelStyle: TextStyle(color: Colors.grey[400]),
                 errorText: _errorText,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[600]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[600]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFfbbf24)),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
               onSubmitted: (_) => _verifyPassword(),
@@ -689,25 +608,21 @@ class _MasterPasswordDialogState extends ConsumerState<_MasterPasswordDialog> {
               children: [
                 Expanded(
                   child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(color: Colors.grey[400]),
-                    ),
+                    onPressed: _isLoading ? null : () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _verifyPassword,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFfbbf24),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text('Verify'),
+                    onPressed: _isLoading ? null : _verifyPassword,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Verify'),
                   ),
                 ),
               ],
@@ -727,11 +642,11 @@ class _AutoLockDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Dialog(
-      backgroundColor: const Color(0xFF1a1a1a),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: Colors.white.withOpacity(0.1),
+          color: Theme.of(context).colorScheme.outline,
         ),
       ),
       child: Padding(
@@ -739,26 +654,31 @@ class _AutoLockDialog extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.timer,
-              color: Color(0xFFfbbf24),
-              size: 48,
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.tertiary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.timer,
+                color: Theme.of(context).colorScheme.tertiary,
+                size: 32,
+              ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Auto-Lock Timer',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 12),
             Text(
               'Select the duration of inactivity before auto-lock:',
-              style: TextStyle(
-                color: Colors.grey[300],
-                fontSize: 14,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -767,21 +687,21 @@ class _AutoLockDialog extends ConsumerWidget {
               (duration) => Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: initialDuration.inMinutes == duration
-                        ? const Color(0xFFfbbf24)
-                        : Colors.grey[600]!,
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.outline,
                   ),
                 ),
                 child: RadioListTile<int>(
                   title: Text(
                     '$duration minutes',
-                    style: const TextStyle(color: Colors.white),
+                    style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   value: duration,
                   groupValue: initialDuration.inMinutes,
-                  activeColor: const Color(0xFFfbbf24),
+                  activeColor: Theme.of(context).colorScheme.primary,
                   onChanged: (value) {
                     if (value != null) {
                       ref.read(autoLockDurationProvider.notifier).state = Duration(minutes: value);
@@ -794,49 +714,11 @@ class _AutoLockDialog extends ConsumerWidget {
             const SizedBox(height: 16),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: Colors.grey[400]),
-              ),
+              child: const Text('Cancel'),
             ),
           ],
         ),
       ),
     );
   }
-}
-
-// Custom painter for settings screen particles
-class SettingsParticlePainter extends CustomPainter {
-  final double animationValue;
-
-  SettingsParticlePainter(this.animationValue);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-
-    // Create gentle floating particles
-    for (int i = 0; i < 10; i++) {
-      final progress = (animationValue + i * 0.1) % 1.0;
-      final x = size.width * (0.05 + i * 0.1) + 
-                (25 * math.sin(progress * 2 * math.pi + i));
-      final y = size.height * (0.1 + progress * 0.8);
-      
-      paint.color = i % 3 == 0 
-        ? const Color(0xFFfbbf24).withOpacity(0.2)
-        : Colors.white.withOpacity(0.1);
-      
-      final radius = 1.5 + math.sin(progress * 3 * math.pi + i) * 0.5;
-      
-      canvas.drawCircle(
-        Offset(x, y),
-        radius,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

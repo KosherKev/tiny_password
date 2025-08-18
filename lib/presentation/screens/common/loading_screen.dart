@@ -15,7 +15,6 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
     with TickerProviderStateMixin {
   late AnimationController _rotationController;
   late AnimationController _pulseController;
-  late AnimationController _particleController;
   late Animation<double> _rotationAnimation;
   late Animation<double> _pulseAnimation;
 
@@ -24,19 +23,14 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
     super.initState();
     
     _rotationController = AnimationController(
-      duration: const Duration(seconds: 3),
+      duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
     
     _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 1, milliseconds: 500),
       vsync: this,
     )..repeat(reverse: true);
-    
-    _particleController = AnimationController(
-      duration: const Duration(seconds: 4),
-      vsync: this,
-    )..repeat();
 
     _rotationAnimation = Tween<double>(
       begin: 0,
@@ -44,8 +38,8 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
     ).animate(_rotationController);
 
     _pulseAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.2,
+      begin: 0.9,
+      end: 1.1,
     ).animate(CurvedAnimation(
       parent: _pulseController,
       curve: Curves.easeInOut,
@@ -56,7 +50,6 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
   void dispose() {
     _rotationController.dispose();
     _pulseController.dispose();
-    _particleController.dispose();
     super.dispose();
   }
 
@@ -65,141 +58,78 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
     final repositoryState = ref.watch(repositoryStateProvider);
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0f0f0f),
-              Color(0xFF1a1a1a),
-              Color(0xFF2d2d2d),
+      backgroundColor: Theme.of(context).colorScheme.background,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Animated logo with clean geometric design
+              AnimatedBuilder(
+                animation: Listenable.merge([_rotationAnimation, _pulseAnimation]),
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _pulseAnimation.value,
+                    child: Transform.rotate(
+                      angle: _rotationAnimation.value,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.security,
+                          size: 50,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              
+              const SizedBox(height: 40),
+              
+              // App title with clean typography
+              Text(
+                'Tiny Password',
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              
+              const SizedBox(height: 8),
+              
+              Text(
+                'Secure Password Manager',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              
+              const SizedBox(height: 60),
+              
+              // Status content
+              _buildStatusContent(repositoryState),
+              
+              const SizedBox(height: 40),
+              
+              // Loading indicator or action buttons
+              _buildLoadingContent(repositoryState),
             ],
           ),
-        ),
-        child: Stack(
-          children: [
-            // Marble texture overlay
-            Container(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: const AssetImage('assets/images/marble_texture.png'),
-                  fit: BoxFit.cover,
-                  opacity: 0.08,
-                  colorFilter: ColorFilter.mode(
-                    Colors.white.withOpacity(0.03),
-                    BlendMode.overlay,
-                  ),
-                ),
-              ),
-            ),
-
-            // Animated particles
-            AnimatedBuilder(
-              animation: _particleController,
-              builder: (context, child) {
-                return CustomPaint(
-                  painter: LoadingParticlePainter(_particleController.value),
-                  size: Size.infinite,
-                );
-              },
-            ),
-
-            // Main content
-            SafeArea(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Animated logo with marble effect
-                      AnimatedBuilder(
-                        animation: Listenable.merge([_rotationAnimation, _pulseAnimation]),
-                        builder: (context, child) {
-                          return Transform.scale(
-                            scale: _pulseAnimation.value,
-                            child: Transform.rotate(
-                              angle: _rotationAnimation.value,
-                              child: Container(
-                                width: 120,
-                                height: 120,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(30),
-                                  gradient: const LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Color(0xFFfbbf24),
-                                      Color(0xFFf59e0b),
-                                      Color(0xFFd97706),
-                                    ],
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFFfbbf24).withOpacity(0.4),
-                                      blurRadius: 30,
-                                      spreadRadius: 10,
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.security,
-                                  size: 60,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      
-                      const SizedBox(height: 40),
-                      
-                      // App title with gradient
-                      ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [
-                            Colors.white,
-                            Color(0xFFf3f4f6),
-                            Color(0xFFfbbf24),
-                          ],
-                        ).createShader(bounds),
-                        child: const Text(
-                          'Tiny Password',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 8),
-                      
-                      Text(
-                        'Secure Password Manager',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[400],
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 60),
-                      
-                      // Status content
-                      _buildStatusContent(repositoryState),
-                      
-                      const SizedBox(height: 40),
-                      
-                      // Loading indicator or action buttons
-                      _buildLoadingContent(repositoryState),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -212,7 +142,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
           icon: Icons.rocket_launch,
           title: 'Starting up...',
           subtitle: 'Preparing the app for first use',
-          color: const Color(0xFF3b82f6),
+          color: Theme.of(context).colorScheme.secondary,
         );
         
       case RepositoryStatus.initializing:
@@ -220,7 +150,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
           icon: Icons.construction,
           title: 'Initializing secure database...',
           subtitle: 'Setting up encryption and storage',
-          color: const Color(0xFFfbbf24),
+          color: Theme.of(context).colorScheme.primary,
         );
         
       case RepositoryStatus.error:
@@ -228,7 +158,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
           icon: Icons.error_outline,
           title: 'Initialization failed',
           subtitle: _simplifyErrorMessage(repositoryState.error ?? 'Unknown error'),
-          color: const Color(0xFFef4444),
+          color: Theme.of(context).colorScheme.error,
         );
         
       case RepositoryStatus.initialized:
@@ -236,7 +166,7 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
           icon: Icons.check_circle_outline,
           title: 'Ready!',
           subtitle: 'Database initialized successfully',
-          color: const Color(0xFF22c55e),
+          color: Theme.of(context).colorScheme.tertiary,
         );
     }
   }
@@ -250,30 +180,32 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          colors: [
-            color.withOpacity(0.1),
-            color.withOpacity(0.05),
-          ],
-        ),
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: color.withOpacity(0.3),
         ),
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            size: 48,
-            color: color,
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              size: 32,
+              color: color,
+            ),
           ),
           const SizedBox(height: 16),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
               color: color,
             ),
             textAlign: TextAlign.center,
@@ -281,9 +213,8 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
           const SizedBox(height: 8),
           Text(
             subtitle,
-            style: TextStyle(
-              fontSize: 14,
-              color: color.withOpacity(0.8),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
@@ -298,19 +229,20 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
         return Column(
           children: [
             SizedBox(
-              width: 40,
-              height: 40,
+              width: 32,
+              height: 32,
               child: CircularProgressIndicator(
                 strokeWidth: 3,
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFfbbf24)),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Theme.of(context).colorScheme.primary,
+                ),
               ),
             ),
             const SizedBox(height: 16),
             Text(
               'Please wait...',
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 14,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -319,35 +251,16 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
       case RepositoryStatus.error:
         return Column(
           children: [
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFfbbf24),
-                    Color(0xFFf59e0b),
-                  ],
-                ),
-              ),
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  ref.read(repositoryStateProvider.notifier).retry();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                icon: const Icon(Icons.refresh, color: Colors.black),
-                label: const Text(
-                  'Retry',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                  ),
+            ElevatedButton.icon(
+              onPressed: () {
+                ref.read(repositoryStateProvider.notifier).retry();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
             ),
@@ -382,10 +295,9 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
                 );
               },
               child: Text(
-                'Show Recovery Options',
+                'Reset App Data',
                 style: TextStyle(
-                  color: const Color(0xFFfbbf24),
-                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.error,
                 ),
               ),
             ),
@@ -394,33 +306,27 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
         
       case RepositoryStatus.initialized:
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFF22c55e).withOpacity(0.1),
-                const Color(0xFF16a34a).withOpacity(0.05),
-              ],
-            ),
+            color: Theme.of(context).colorScheme.tertiary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: const Color(0xFF22c55e).withOpacity(0.3),
+              color: Theme.of(context).colorScheme.tertiary.withOpacity(0.3),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.check_circle,
-                color: Color(0xFF22c55e),
+                color: Theme.of(context).colorScheme.tertiary,
                 size: 20,
               ),
               const SizedBox(width: 8),
               Text(
                 'Initialization complete',
-                style: TextStyle(
-                  color: const Color(0xFF22c55e),
-                  fontSize: 14,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.tertiary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -449,58 +355,4 @@ class _LoadingScreenState extends ConsumerState<LoadingScreen>
     
     return error.length > 100 ? '${error.substring(0, 100)}...' : error;
   }
-}
-
-// Custom painter for loading screen particles
-class LoadingParticlePainter extends CustomPainter {
-  final double animationValue;
-
-  LoadingParticlePainter(this.animationValue);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-
-    // Create orbiting particles around the center
-    final center = Offset(size.width / 2, size.height / 2);
-    
-    for (int i = 0; i < 12; i++) {
-      final angle = (animationValue * 2 * math.pi) + (i * math.pi / 6);
-      final radius = 100 + (20 * math.sin(animationValue * 4 * math.pi + i));
-      
-      final x = center.dx + radius * math.cos(angle);
-      final y = center.dy + radius * math.sin(angle);
-      
-      paint.color = i % 2 == 0 
-        ? const Color(0xFFfbbf24).withOpacity(0.6)
-        : Colors.white.withOpacity(0.4);
-      
-      final particleRadius = 2 + math.sin(animationValue * 6 * math.pi + i) * 1;
-      
-      canvas.drawCircle(
-        Offset(x, y),
-        particleRadius,
-        paint,
-      );
-    }
-
-    // Add some floating particles
-    for (int i = 0; i < 8; i++) {
-      final progress = (animationValue + i * 0.125) % 1.0;
-      final x = size.width * (i * 0.125 + 0.1) + 
-                (30 * math.sin(progress * 2 * math.pi));
-      final y = size.height * progress;
-      
-      paint.color = const Color(0xFFfbbf24).withOpacity(0.3);
-      
-      canvas.drawCircle(
-        Offset(x % size.width, y),
-        1.5,
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
