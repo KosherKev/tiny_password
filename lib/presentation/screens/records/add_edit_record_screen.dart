@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -5,6 +6,8 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/record.dart';
+import '../../../domain/models/attachment.dart';
+import '../../../services/attachment_service.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/custom_button.dart';
 
@@ -27,6 +30,10 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
   
   // Field controllers for different record types
   final Map<String, TextEditingController> _fieldControllers = {};
+  
+  // Attachments
+  List<Attachment> _attachments = [];
+  bool _showSensitiveFields = true; // Show attachments by default
   
   String _selectedCategory = 'Personal';
   bool _isFavorite = false;
@@ -128,6 +135,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
           _notesController.text = record.notes ?? '';
           _selectedCategory = record.category ?? 'Personal';
           _isFavorite = record.isFavorite;
+          _attachments = List.from(record.attachments);
 
           // Populate field controllers
           for (final entry in record.fields.entries) {
@@ -177,6 +185,7 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
         isFavorite: _isFavorite,
         createdAt: now,
         modifiedAt: now,
+        attachments: _attachments,
       );
 
       if (widget.recordId != null) {
@@ -240,6 +249,334 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
         return AppConstants.vehicleFields;
       case RecordType.note:
         return {};
+    }
+  }
+
+  bool _supportsAttachments(RecordType type) {
+    return [
+      RecordType.identity,
+      RecordType.vehicle,
+      RecordType.document,
+      RecordType.membership,
+      RecordType.creditCard,
+    ].contains(type);
+  }
+
+  List<Widget> _buildAttachmentsSection(BuildContext context, Color typeColor) {
+    return [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Attachments',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: typeColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_attachments.isNotEmpty)
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _showSensitiveFields = !_showSensitiveFields;
+                    });
+                  },
+                  icon: Icon(
+                    _showSensitiveFields ? Icons.visibility_off : Icons.visibility,
+                    color: typeColor,
+                    size: 20,
+                  ),
+                  tooltip: _showSensitiveFields ? 'Hide Attachments' : 'Show Attachments',
+                ),
+              IconButton(
+                onPressed: () => _showAttachmentPicker(context),
+                icon: Icon(
+                  Icons.add_photo_alternate_outlined,
+                  color: typeColor,
+                ),
+                tooltip: 'Add Attachment',
+              ),
+            ],
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      if (_attachments.isEmpty)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                Icons.attach_file_outlined,
+                size: 32,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No attachments yet',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Tap + to add images or PDFs',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        )
+      else
+        ...List.generate(_attachments.length, (index) {
+          final attachment = _attachments[index];
+          return _buildAttachmentPreview(context, attachment, index, typeColor);
+        }),
+    ];
+  }
+
+  Future<void> _showAttachmentPicker(BuildContext context) async {
+    final authService = ref.read(authServiceProvider);
+    final attachmentService = AttachmentService(authService.encryptionService);
+    final attachment = await attachmentService.showAttachmentPicker(context);
+    
+    if (attachment != null) {
+      setState(() {
+        _attachments.add(attachment);
+      });
+    }
+  }
+
+  void _removeAttachment(int index) {
+    setState(() {
+      _attachments.removeAt(index);
+    });
+  }
+
+  Widget _buildAttachmentPreview(BuildContext context, Attachment attachment, int index, Color typeColor) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with filename and actions
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Icon(
+                  attachment.type == AttachmentType.image
+                      ? Icons.image_outlined
+                      : Icons.picture_as_pdf_outlined,
+                  color: typeColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        attachment.fileName,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        attachment.formattedFileSize,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => _removeAttachment(index),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: Theme.of(context).colorScheme.error,
+                    size: 20,
+                  ),
+                  tooltip: 'Remove',
+                ),
+              ],
+            ),
+          ),
+          // Preview content
+          if (_showSensitiveFields)
+            _buildAttachmentContent(context, attachment, typeColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttachmentContent(BuildContext context, Attachment attachment, Color typeColor) {
+    return FutureBuilder<File?>(
+      future: _getAttachmentFile(attachment),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            height: 200,
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        if (snapshot.hasError || !snapshot.hasData) {
+          return Container(
+            height: 100,
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Preview unavailable',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        final file = snapshot.data!;
+        
+        if (attachment.type == AttachmentType.image) {
+          return Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            constraints: const BoxConstraints(
+              maxHeight: 300,
+              minHeight: 150,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                file,
+                fit: BoxFit.contain,
+                width: double.infinity,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.broken_image_outlined,
+                            color: Theme.of(context).colorScheme.error,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Image preview failed',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        } else {
+          // PDF preview placeholder
+          return Container(
+            height: 200,
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            decoration: BoxDecoration(
+              color: typeColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: typeColor.withOpacity(0.3),
+              ),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.picture_as_pdf,
+                    color: typeColor,
+                    size: 48,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'PDF Document',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: typeColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap to view full document',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Future<File?> _getAttachmentFile(Attachment attachment) async {
+    try {
+      final authService = ref.read(authServiceProvider);
+      final attachmentService = AttachmentService(authService.encryptionService);
+      return await attachmentService.getTempFile(attachment);
+    } catch (e) {
+      return null;
     }
   }
 
@@ -324,6 +661,12 @@ class _AddEditRecordScreenState extends ConsumerState<AddEditRecordScreen>
                                         labelText: 'Notes (Optional)',
                                         maxLines: 4,
                                       ),
+
+                                      const SizedBox(height: 24),
+
+                                      // Attachments Section (for supported record types)
+                                      if (_supportsAttachments(_selectedType))
+                                        ..._buildAttachmentsSection(context, typeColor),
 
                                       const SizedBox(height: 140), // Increased space for bottom button
                                     ],

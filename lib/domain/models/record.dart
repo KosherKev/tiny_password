@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'attachment.dart';
 
 enum RecordType {
   login,
@@ -55,6 +56,7 @@ class Record {
   final bool isFavorite;
   final DateTime createdAt;
   final DateTime modifiedAt;
+  final List<Attachment> attachments;
 
   const Record({
     required this.id,
@@ -66,6 +68,7 @@ class Record {
     required this.isFavorite,
     required this.createdAt,
     required this.modifiedAt,
+    this.attachments = const [],
   });
 
   Record copyWith({
@@ -78,6 +81,7 @@ class Record {
     bool? isFavorite,
     DateTime? createdAt,
     DateTime? modifiedAt,
+    List<Attachment>? attachments,
   }) {
     return Record(
       id: id ?? this.id,
@@ -89,6 +93,7 @@ class Record {
       isFavorite: isFavorite ?? this.isFavorite,
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
+      attachments: attachments ?? List.from(this.attachments),
     );
   }
 
@@ -103,6 +108,7 @@ class Record {
       'isFavorite': isFavorite,
       'createdAt': createdAt.toIso8601String(),
       'modifiedAt': modifiedAt.toIso8601String(),
+      'attachments': attachments.map((a) => a.toJson()).toList(),
     };
   }
 
@@ -119,6 +125,9 @@ class Record {
       isFavorite: json['isFavorite'] as bool,
       createdAt: DateTime.parse(json['createdAt'] as String),
       modifiedAt: DateTime.parse(json['modifiedAt'] as String),
+      attachments: (json['attachments'] as List<dynamic>? ?? [])
+          .map((a) => Attachment.fromJson(a as Map<String, dynamic>))
+          .toList(),
     );
   }
 
@@ -265,6 +274,52 @@ class Record {
     }
   }
 
+  // Check if this record type supports attachments
+  bool get supportsAttachments {
+    switch (type) {
+      case RecordType.identity:
+      case RecordType.vehicle:
+      case RecordType.document:
+      case RecordType.membership:
+      case RecordType.creditCard:
+      case RecordType.software:
+        return true;
+      case RecordType.login:
+      case RecordType.bankAccount:
+      case RecordType.note:
+      case RecordType.address:
+      case RecordType.wifi:
+      case RecordType.server:
+        return false;
+    }
+  }
+
+  // Get attachment count by type
+  int get imageAttachmentCount => attachments.where((a) => a.isImage).length;
+  int get pdfAttachmentCount => attachments.where((a) => a.isPdf).length;
+  
+  // Get attachments by type
+  List<Attachment> get imageAttachments => attachments.where((a) => a.isImage).toList();
+  List<Attachment> get pdfAttachments => attachments.where((a) => a.isPdf).toList();
+  
+  // Check if record has any attachments
+  bool get hasAttachments => attachments.isNotEmpty;
+  
+  // Get total attachment file size
+  int get totalAttachmentSize => attachments.fold(0, (sum, attachment) => sum + attachment.fileSize);
+  
+  // Get formatted total attachment size
+  String get formattedTotalAttachmentSize {
+    final totalSize = totalAttachmentSize;
+    if (totalSize < 1024) {
+      return '$totalSize B';
+    } else if (totalSize < 1024 * 1024) {
+      return '${(totalSize / 1024).toStringAsFixed(1)} KB';
+    } else {
+      return '${(totalSize / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+  }
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -277,7 +332,8 @@ class Record {
         other.category == category &&
         other.isFavorite == isFavorite &&
         other.createdAt == createdAt &&
-        other.modifiedAt == modifiedAt;
+        other.modifiedAt == modifiedAt &&
+        listEquals(other.attachments, attachments);
   }
 
   @override
@@ -292,6 +348,7 @@ class Record {
       isFavorite,
       createdAt,
       modifiedAt,
+      Object.hashAll(attachments),
     );
   }
 }

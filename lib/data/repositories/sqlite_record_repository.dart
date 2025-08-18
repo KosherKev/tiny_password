@@ -7,6 +7,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/encryption/encryption_service.dart';
 import '../../core/services/secure_storage_service.dart';
 import '../../domain/models/record.dart';
+import '../../domain/models/attachment.dart';
 import '../../domain/repositories/record_repository.dart';
 
 class SQLiteRecordRepository implements RecordRepository {
@@ -258,10 +259,28 @@ class SQLiteRecordRepository implements RecordRepository {
       ''');
       print('Categories table created');
 
+      // Create attachments table
+      await db.execute('''
+        CREATE TABLE attachments(
+          id TEXT PRIMARY KEY,
+          record_id TEXT NOT NULL,
+          file_name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          file_path TEXT NOT NULL,
+          file_size INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          description TEXT,
+          FOREIGN KEY (record_id) REFERENCES records (id) ON DELETE CASCADE
+        )
+      ''');
+      print('Attachments table created');
+
       // Create indexes
       await db.execute('CREATE INDEX idx_records_category ON records(category)');
       await db.execute('CREATE INDEX idx_records_type ON records(type)');
       await db.execute('CREATE INDEX idx_records_is_favorite ON records(is_favorite)');
+      await db.execute('CREATE INDEX idx_attachments_record_id ON attachments(record_id)');
+      await db.execute('CREATE INDEX idx_attachments_type ON attachments(type)');
       print('Indexes created');
 
       // Insert default categories
@@ -417,7 +436,7 @@ class SQLiteRecordRepository implements RecordRepository {
       if (records.isEmpty) return null;
       
       try {
-        return _decryptRecord(records.first);
+        return await _decryptRecordWithAttachments(records.first);
       } catch (e) {
         print('Failed to decrypt record $id: $e');
         // Remove corrupted record
@@ -564,8 +583,16 @@ class SQLiteRecordRepository implements RecordRepository {
   Future<Record> createRecord(Record record) async {
     try {
       final db = await database;
-      final encryptedRecord = _encryptRecord(record);
-      await db.insert('records', encryptedRecord);
+      await db.transaction((txn) async {
+        // Insert the record
+        final encryptedRecord = _encryptRecord(record);
+        await txn.insert('records', encryptedRecord);
+        
+        // Insert attachments if any
+        for (final attachment in record.attachments) {
+          await _insertAttachment(txn, attachment, record.id);
+        }
+      });
       print('Record created successfully: ${record.id}');
       return record;
     } catch (e) {
@@ -579,13 +606,26 @@ class SQLiteRecordRepository implements RecordRepository {
     try {
       final db = await database;
       final updatedRecord = record.copyWith(modifiedAt: DateTime.now());
-      final encryptedRecord = _encryptRecord(updatedRecord);
-      await db.update(
-        'records',
-        encryptedRecord,
-        where: 'id = ?',
-        whereArgs: [record.id],
-      );
+      
+      await db.transaction((txn) async {
+        // Update the record
+        final encryptedRecord = _encryptRecord(updatedRecord);
+        await txn.update(
+          'records',
+          encryptedRecord,
+          where: 'id = ?',
+          whereArgs: [record.id],
+        );
+        
+        // Delete existing attachments
+        await txn.delete('attachments', where: 'record_id = ?', whereArgs: [record.id]);
+        
+        // Insert updated attachments
+        for (final attachment in updatedRecord.attachments) {
+          await _insertAttachment(txn, attachment, record.id);
+        }
+      });
+      
       print('Record updated successfully: ${record.id}');
       return updatedRecord;
     } catch (e) {
@@ -598,7 +638,12 @@ class SQLiteRecordRepository implements RecordRepository {
   Future<void> deleteRecord(String id) async {
     try {
       final db = await database;
-      await db.delete('records', where: 'id = ?', whereArgs: [id]);
+      await db.transaction((txn) async {
+        // Delete attachments first (CASCADE should handle this, but being explicit)
+        await txn.delete('attachments', where: 'record_id = ?', whereArgs: [id]);
+        // Delete the record
+        await txn.delete('records', where: 'id = ?', whereArgs: [id]);
+      });
       print('Record deleted successfully: $id');
     } catch (e) {
       print('Error deleting record: $e');
@@ -868,6 +913,7 @@ class SQLiteRecordRepository implements RecordRepository {
     try {
       final db = await database;
       await db.transaction((txn) async {
+        await txn.delete('attachments');
         await txn.delete('records');
         await txn.delete('categories');
         
@@ -912,6 +958,48 @@ class SQLiteRecordRepository implements RecordRepository {
     }
   }
 
+  /// Insert attachment into database
+  Future<void> _insertAttachment(DatabaseExecutor txn, Attachment attachment, String recordId) async {
+    await txn.insert('attachments', {
+      'id': attachment.id,
+      'record_id': recordId,
+      'file_name': attachment.fileName,
+      'type': attachment.type.toString().split('.').last,
+      'file_path': attachment.filePath,
+      'file_size': attachment.fileSize,
+      'created_at': attachment.createdAt.toIso8601String(),
+      'description': attachment.description,
+    });
+  }
+
+  /// Load attachments for a record
+  Future<List<Attachment>> _loadAttachments(String recordId) async {
+    try {
+      final db = await database;
+      final attachmentData = await db.query(
+        'attachments',
+        where: 'record_id = ?',
+        whereArgs: [recordId],
+        orderBy: 'created_at ASC',
+      );
+      
+      return attachmentData.map((data) => Attachment(
+        id: data['id'] as String,
+        fileName: data['file_name'] as String,
+        type: AttachmentType.values.firstWhere(
+          (type) => type.toString().split('.').last == data['type'],
+        ),
+        filePath: data['file_path'] as String,
+        fileSize: data['file_size'] as int,
+        createdAt: DateTime.parse(data['created_at'] as String),
+        description: data['description'] as String?,
+      )).toList();
+    } catch (e) {
+      print('Error loading attachments for record $recordId: $e');
+      return [];
+    }
+  }
+
   /// Decrypt record from storage
   Record _decryptRecord(Map<String, dynamic> data) {
     if (!_encryptionService.isInitialized) {
@@ -935,10 +1023,18 @@ class SQLiteRecordRepository implements RecordRepository {
         isFavorite: data['is_favorite'] == 1,
         createdAt: DateTime.parse(data['created_at'] as String),
         modifiedAt: DateTime.parse(data['modified_at'] as String),
+        attachments: [], // Will be loaded separately
       );
     } catch (e) {
       print('Error decrypting record: $e');
       throw Exception('Failed to decrypt record: $e');
     }
+  }
+
+  /// Decrypt record from storage with attachments
+  Future<Record> _decryptRecordWithAttachments(Map<String, dynamic> data) async {
+    final record = _decryptRecord(data);
+    final attachments = await _loadAttachments(record.id);
+    return record.copyWith(attachments: attachments);
   }
 }

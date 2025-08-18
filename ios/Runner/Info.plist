@@ -47,7 +47,13 @@
 	<string>Guardian uses Face ID to quickly and securely unlock your password vault without entering your master password.</string>
 
 	<key>NSBiometricUsageDescription</key>
-	<string>Guardian uses biometric authentication (Face ID/Touch ID) to provide secure and convenient access to your encrypted password vault.</string>		
+	<string>Guardian uses biometric authentication (Face ID/Touch ID) to provide secure and convenient access to your encrypted password vault.</string>
+
+	<key>NSCameraUsageDescription</key>
+	<string>Guardian needs camera access to take photos of documents, cards, and other items to securely attach to your password records.</string>
+
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Guardian needs photo library access to select images from your photos to securely attach to your password records.</string>
 
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>

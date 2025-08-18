@@ -33,13 +33,24 @@ class EncryptionService {
       
       final key = await _deriveKey(masterPassword, salt);
       
-      // Get or generate IV persistently
+      // Get or generate IV persistently with validation
       String? ivBase64 = await _getStoredIV();
-      if (ivBase64 == null) {
+      if (ivBase64 == null || !_isValidIV(ivBase64)) {
+        print('Generating new IV (previous was ${ivBase64 == null ? "missing" : "invalid"})');
         _iv = IV.fromSecureRandom(16);
         await _storeIV(base64.encode(_iv!.bytes));
       } else {
-        _iv = IV.fromBase64(ivBase64);
+        try {
+          _iv = IV.fromBase64(ivBase64);
+          // Validate IV length
+          if (_iv!.bytes.length != 16) {
+            throw Exception('Invalid IV length: ${_iv!.bytes.length}');
+          }
+        } catch (e) {
+          print('Stored IV is corrupted, generating new one: $e');
+          _iv = IV.fromSecureRandom(16);
+          await _storeIV(base64.encode(_iv!.bytes));
+        }
       }
       
       _encrypter = Encrypter(AES(Key.fromBase64(base64.encode(key))));
@@ -97,6 +108,23 @@ class EncryptionService {
     print('Encryption service reset');
   }
 
+  /// Force regenerate IV (useful when corruption is detected)
+  Future<void> forceRegenerateIV() async {
+    if (!_isInitialized) {
+      throw Exception('Encryption service not initialized');
+    }
+    
+    try {
+      print('Force regenerating IV due to corruption');
+      _iv = IV.fromSecureRandom(16);
+      await _storeIV(base64.encode(_iv!.bytes));
+      print('IV force regenerated successfully');
+    } catch (e) {
+      print('Failed to force regenerate IV: $e');
+      throw Exception('Failed to force regenerate IV: $e');
+    }
+  }
+
   // Add these new methods
   Future<String?> _getStoredSalt() async {
     // You'll need to add salt storage to SecureStorageService
@@ -117,6 +145,16 @@ class EncryptionService {
   Future<void> _storeIV(String ivBase64) async {
     final secureStorage = SecureStorageService();
     await secureStorage.storeIV(ivBase64);
+  }
+
+  /// Validate if an IV string is properly formatted
+  bool _isValidIV(String ivBase64) {
+    try {
+      final decoded = base64.decode(ivBase64);
+      return decoded.length == 16;
+    } catch (e) {
+      return false;
+    }
   }
 
   /// Generate a truly random salt for database passwords
@@ -194,11 +232,20 @@ class EncryptionService {
     if (!_isInitialized || _encrypter == null || _iv == null) {
       throw Exception('EncryptionService not initialized. Call initializeWithMasterPassword() first.');
     }
+    
+    // Additional validation
+    if (_iv!.bytes.length != 16) {
+      print('Invalid IV length detected: ${_iv!.bytes.length}, regenerating...');
+      throw Exception('Invalid IV length: ${_iv!.bytes.length}. Please reinitialize encryption service.');
+    }
+    
     try {
       final encrypted = _encrypter!.encrypt(data, iv: _iv!);
       return encrypted.base64;
     } catch (e) {
       print('Encryption failed: $e');
+      print('IV length: ${_iv!.bytes.length}');
+      print('Data length: ${data.length}');
       throw Exception('Failed to encrypt data: $e');
     }
   }
@@ -214,6 +261,35 @@ class EncryptionService {
     } catch (e) {
       print('Decryption failed: $e');
       throw Exception('Failed to decrypt data: $e');
+    }
+  }
+
+  /// Encrypt bytes (for file attachments)
+  Uint8List encryptBytes(Uint8List data) {
+    if (!_isInitialized || _encrypter == null || _iv == null) {
+      throw Exception('EncryptionService not initialized. Call initializeWithMasterPassword() first.');
+    }
+    try {
+      final encrypted = _encrypter!.encryptBytes(data, iv: _iv!);
+      return encrypted.bytes;
+    } catch (e) {
+      print('Bytes encryption failed: $e');
+      throw Exception('Failed to encrypt bytes: $e');
+    }
+  }
+
+  /// Decrypt bytes (for file attachments)
+  Uint8List decryptBytes(Uint8List encryptedData) {
+    if (!_isInitialized || _encrypter == null || _iv == null) {
+      throw Exception('EncryptionService not initialized. Call initializeWithMasterPassword() first.');
+    }
+    try {
+      final encrypted = Encrypted(encryptedData);
+      final decryptedBytes = _encrypter!.decryptBytes(encrypted, iv: _iv!);
+      return Uint8List.fromList(decryptedBytes);
+    } catch (e) {
+      print('Bytes decryption failed: $e');
+      throw Exception('Failed to decrypt bytes: $e');
     }
   }
 
