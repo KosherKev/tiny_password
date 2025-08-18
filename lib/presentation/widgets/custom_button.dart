@@ -40,12 +40,12 @@ class _CustomButtonState extends State<CustomButton>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 150),
+      duration: const Duration(milliseconds: 100),
       vsync: this,
     );
     _scaleAnimation = Tween<double>(
       begin: 1.0,
-      end: 0.95,
+      end: 0.97,
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeInOut,
@@ -80,7 +80,8 @@ class _CustomButtonState extends State<CustomButton>
 
   @override
   Widget build(BuildContext context) {
-
+    final theme = Theme.of(context);
+    
     return AnimatedBuilder(
       animation: _scaleAnimation,
       builder: (context, child) {
@@ -91,18 +92,16 @@ class _CustomButtonState extends State<CustomButton>
             onTapUp: _onTapUp,
             onTapCancel: _onTapCancel,
             onTap: widget.onPressed,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+            child: Container(
               width: widget.width,
               height: widget.height ?? 56,
               padding: widget.padding ?? const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               decoration: BoxDecoration(
-                borderRadius: widget.borderRadius ?? BorderRadius.circular(16),
-                gradient: _getGradient(),
-                border: widget.isOutlined ? _getBorder() : null,
-                boxShadow: _getShadow(),
+                borderRadius: widget.borderRadius ?? BorderRadius.circular(12),
+                color: _getBackgroundColor(theme),
+                border: widget.isOutlined ? _getBorder(theme) : null,
               ),
-              child: _buildContent(),
+              child: _buildContent(theme),
             ),
           ),
         );
@@ -110,97 +109,42 @@ class _CustomButtonState extends State<CustomButton>
     );
   }
 
-  LinearGradient? _getGradient() {
-    if (widget.isOutlined) return null;
+  Color _getBackgroundColor(ThemeData theme) {
+    if (widget.isOutlined) return Colors.transparent;
     
     if (widget.onPressed == null || widget.isLoading) {
-      return LinearGradient(
-        colors: [
-          Colors.grey[600]!,
-          Colors.grey[700]!,
-        ],
-      );
+      return theme.colorScheme.onSurface.withOpacity(0.12);
     }
 
     if (widget.isDestructive) {
-      return const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Color(0xFFef4444),
-          Color(0xFFdc2626),
-          Color(0xFFb91c1c),
-        ],
-      );
+      return theme.colorScheme.error;
     }
 
-    return const LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [
-        Color(0xFFfbbf24), // Gold
-        Color(0xFFf59e0b), // Darker gold
-        Color(0xFFd97706), // Amber
-      ],
-    );
+    return theme.colorScheme.primary;
   }
 
-  Border? _getBorder() {
+  Border? _getBorder(ThemeData theme) {
     if (!widget.isOutlined) return null;
 
     Color borderColor;
     if (widget.isDestructive) {
-      borderColor = const Color(0xFFef4444);
+      borderColor = theme.colorScheme.error;
     } else {
-      borderColor = const Color(0xFFfbbf24);
+      borderColor = theme.colorScheme.primary;
+    }
+
+    if (widget.onPressed == null || widget.isLoading) {
+      borderColor = borderColor.withOpacity(0.38);
     }
 
     return Border.all(
-      color: borderColor.withOpacity(widget.onPressed != null ? 1.0 : 0.5),
-      width: 2,
+      color: borderColor,
+      width: 1,
     );
   }
 
-  List<BoxShadow>? _getShadow() {
-    if (widget.isOutlined || widget.onPressed == null || widget.isLoading) {
-      return null;
-    }
-
-    Color shadowColor;
-    if (widget.isDestructive) {
-      shadowColor = const Color(0xFFef4444);
-    } else {
-      shadowColor = const Color(0xFFfbbf24);
-    }
-
-    return [
-      BoxShadow(
-        color: shadowColor.withOpacity(_isPressed ? 0.4 : 0.25),
-        blurRadius: _isPressed ? 8 : 12,
-        spreadRadius: _isPressed ? 1 : 2,
-        offset: Offset(0, _isPressed ? 2 : 4),
-      ),
-    ];
-  }
-
-  Widget _buildContent() {
-    Color textColor;
-    
-    if (widget.isOutlined) {
-      if (widget.isDestructive) {
-        textColor = const Color(0xFFef4444);
-      } else {
-        textColor = const Color(0xFFfbbf24);
-      }
-      if (widget.onPressed == null || widget.isLoading) {
-        textColor = textColor.withOpacity(0.5);
-      }
-    } else {
-      textColor = widget.isDestructive ? Colors.white : Colors.black;
-      if (widget.onPressed == null || widget.isLoading) {
-        textColor = Colors.grey[400]!;
-      }
-    }
+  Widget _buildContent(ThemeData theme) {
+    Color textColor = _getTextColor(theme);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -226,15 +170,32 @@ class _CustomButtonState extends State<CustomButton>
           ],
           Text(
             widget.text,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+            style: theme.textTheme.labelLarge?.copyWith(
               color: textColor,
+              fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
             ),
           ),
         ],
       ],
     );
+  }
+
+  Color _getTextColor(ThemeData theme) {
+    if (widget.isOutlined) {
+      if (widget.onPressed == null || widget.isLoading) {
+        return theme.colorScheme.onSurface.withOpacity(0.38);
+      }
+      return widget.isDestructive 
+          ? theme.colorScheme.error 
+          : theme.colorScheme.primary;
+    } else {
+      if (widget.onPressed == null || widget.isLoading) {
+        return theme.colorScheme.onSurface.withOpacity(0.38);
+      }
+      return widget.isDestructive 
+          ? theme.colorScheme.onError 
+          : theme.colorScheme.onPrimary;
+    }
   }
 }

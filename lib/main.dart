@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tiny_password/core/providers/providers.dart';
 import 'core/services/navigation_service.dart';
 import 'core/services/password_generator_service.dart';
+import 'core/theme/app_theme.dart';
 import 'presentation/screens/auth/setup_master_password_screen.dart';
 import 'presentation/screens/auth/unlock_screen.dart';
 import 'presentation/screens/common/loading_screen.dart';
@@ -44,16 +45,8 @@ class TinyPasswordApp extends ConsumerWidget {
       child: MaterialApp(
         title: 'Tiny Password',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorSchemeSeed: Colors.blue,
-          brightness: Brightness.light,
-        ),
-        darkTheme: ThemeData(
-          useMaterial3: true,
-          colorSchemeSeed: Colors.blue,
-          brightness: Brightness.dark,
-        ),
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
         themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
         navigatorKey: NavigationService.navigatorKey,
         home: const AppHome(),

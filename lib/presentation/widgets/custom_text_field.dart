@@ -105,88 +105,101 @@ class _CustomTextFieldState extends State<CustomTextField>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return AnimatedBuilder(
       animation: _focusAnimation,
       builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.1 + _focusAnimation.value * 0.05),
-                Colors.white.withOpacity(0.05 + _focusAnimation.value * 0.03),
-              ],
-            ),
-            border: Border.all(
-              color: _getBorderColor(),
-              width: 1 + _focusAnimation.value,
-            ),
-            boxShadow: [
-              if (_isFocused)
-                BoxShadow(
-                  color: const Color(0xFFfbbf24).withOpacity(0.2),
-                  blurRadius: 8,
-                  spreadRadius: 2,
-                ),
-            ],
+        return TextFormField(
+          controller: widget.controller,
+          focusNode: _focusNode,
+          obscureText: _obscureText,
+          readOnly: widget.readOnly,
+          autofocus: widget.autofocus,
+          keyboardType: widget.keyboardType,
+          textInputAction: widget.textInputAction,
+          onChanged: widget.onChanged,
+          onTap: widget.onTap,
+          validator: widget.validator,
+          inputFormatters: widget.inputFormatters,
+          maxLines: widget.obscureText ? 1 : widget.maxLines,
+          minLines: widget.minLines,
+          enabled: widget.enabled,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: widget.enabled == false 
+                ? theme.colorScheme.onSurface.withOpacity(0.38)
+                : theme.colorScheme.onSurface,
           ),
-          child: TextFormField(
-            controller: widget.controller,
-            focusNode: _focusNode,
-            obscureText: _obscureText,
-            readOnly: widget.readOnly,
-            autofocus: widget.autofocus,
-            keyboardType: widget.keyboardType,
-            textInputAction: widget.textInputAction,
-            onChanged: widget.onChanged,
-            onTap: widget.onTap,
-            validator: widget.validator,
-            inputFormatters: widget.inputFormatters,
-            maxLines: widget.obscureText ? 1 : widget.maxLines,
-            minLines: widget.minLines,
-            enabled: widget.enabled,
-            style: TextStyle(
-              color: widget.enabled == false ? Colors.grey[400] : Colors.white,
-              fontSize: 16,
+          decoration: InputDecoration(
+            labelText: widget.labelText,
+            hintText: widget.hintText,
+            errorText: widget.errorText,
+            prefixIcon: widget.prefix,
+            suffixIcon: _buildSuffixIcon(theme),
+            contentPadding: widget.contentPadding ?? 
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            filled: true,
+            fillColor: _isFocused 
+                ? theme.colorScheme.surfaceVariant.withOpacity(0.8)
+                : theme.colorScheme.surfaceVariant,
+            
+            // Bauhaus-style borders
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8), // Sharp geometric corners
+              borderSide: BorderSide(
+                color: theme.colorScheme.outline,
+                width: 1,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: theme.colorScheme.outline,
+                width: 1,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: theme.colorScheme.primary,
+                width: 2, // Thicker border when focused
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: theme.colorScheme.error,
+                width: 1,
+              ),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: theme.colorScheme.error,
+                width: 2,
+              ),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: theme.colorScheme.outline.withOpacity(0.38),
+                width: 1,
+              ),
+            ),
+            
+            // Label and hint styling
+            labelStyle: theme.textTheme.bodyMedium?.copyWith(
+              color: _isFocused 
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
-            decoration: InputDecoration(
-              labelText: widget.labelText,
-              hintText: widget.hintText,
-              errorText: widget.errorText,
-              prefixIcon: widget.prefix != null 
-                ? Container(
-                    margin: const EdgeInsets.only(left: 16, right: 12),
-                    child: widget.prefix,
-                  )
-                : null,
-              suffixIcon: _buildSuffixIcon(),
-              contentPadding: widget.contentPadding ?? 
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              errorBorder: InputBorder.none,
-              focusedErrorBorder: InputBorder.none,
-              disabledBorder: InputBorder.none,
-              labelStyle: TextStyle(
-                color: _isFocused 
-                  ? const Color(0xFFfbbf24)
-                  : Colors.grey[400],
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-              hintStyle: TextStyle(
-                color: Colors.grey[500],
-                fontSize: 16,
-              ),
-              errorStyle: const TextStyle(
-                color: Color(0xFFef4444),
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
+            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            errorStyle: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+              fontWeight: FontWeight.w500,
             ),
           ),
         );
@@ -194,17 +207,7 @@ class _CustomTextFieldState extends State<CustomTextField>
     );
   }
 
-  Color _getBorderColor() {
-    if (widget.errorText != null) {
-      return const Color(0xFFef4444);
-    }
-    if (_isFocused) {
-      return const Color(0xFFfbbf24);
-    }
-    return Colors.white.withOpacity(0.2);
-  }
-
-  Widget? _buildSuffixIcon() {
+  Widget? _buildSuffixIcon(ThemeData theme) {
     if (widget.suffix != null) return widget.suffix;
 
     List<Widget> actions = [];
@@ -219,9 +222,9 @@ class _CustomTextFieldState extends State<CustomTextField>
               _obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
               key: ValueKey(_obscureText),
               color: _isFocused
-                  ? const Color(0xFFfbbf24)
-                  : Colors.grey[400],
-              size: 22,
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+              size: 20,
             ),
           ),
           onPressed: () {
@@ -242,8 +245,8 @@ class _CustomTextFieldState extends State<CustomTextField>
         IconButton(
           icon: Icon(
             Icons.clear_rounded,
-            color: Colors.grey[400],
-            size: 22,
+            color: theme.colorScheme.onSurfaceVariant,
+            size: 20,
           ),
           onPressed: () {
             widget.controller?.clear();

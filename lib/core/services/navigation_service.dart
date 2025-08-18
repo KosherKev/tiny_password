@@ -5,7 +5,7 @@ import '../../presentation/screens/auth/unlock_screen.dart';
 
 import '../../presentation/screens/home/home_screen.dart';
 import '../../presentation/screens/home/generate_password_screen.dart';
-import '../../presentation/screens/home/record_details_screen.dart';
+import '../../presentation/screens/records/record_details_screen.dart';
 
 import '../../presentation/screens/records/add_edit_record_screen.dart';
 
