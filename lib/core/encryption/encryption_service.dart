@@ -239,13 +239,16 @@ class EncryptionService {
       throw Exception('Invalid IV length: ${_iv!.bytes.length}. Please reinitialize encryption service.');
     }
     
+    // Handle empty strings by using a placeholder
+    String dataToEncrypt = data.isEmpty ? '__EMPTY__' : data;
+    
     try {
-      final encrypted = _encrypter!.encrypt(data, iv: _iv!);
+      final encrypted = _encrypter!.encrypt(dataToEncrypt, iv: _iv!);
       return encrypted.base64;
     } catch (e) {
       print('Encryption failed: $e');
       print('IV length: ${_iv!.bytes.length}');
-      print('Data length: ${data.length}');
+      print('Data length: ${dataToEncrypt.length}');
       throw Exception('Failed to encrypt data: $e');
     }
   }
@@ -257,7 +260,10 @@ class EncryptionService {
     }
     try {
       final encrypted = Encrypted.fromBase64(encryptedData);
-      return _encrypter!.decrypt(encrypted, iv: _iv!);
+      final decryptedData = _encrypter!.decrypt(encrypted, iv: _iv!);
+      
+      // Handle empty string placeholder
+      return decryptedData == '__EMPTY__' ? '' : decryptedData;
     } catch (e) {
       print('Decryption failed: $e');
       throw Exception('Failed to decrypt data: $e');
